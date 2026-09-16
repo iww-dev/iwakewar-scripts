@@ -399,11 +399,15 @@ RunService.Heartbeat:Connect(function()
                 st.lastSign = s
                 if not st.fired then
                     local curMs = math.abs(scale) / (11 * speed) * 2000
-                    local aimAt = st.target + inputLead + 30
-                    if crossing or curMs <= aimAt then
+                    local sweetSpot = st.target + inputLead
+                    local aimAt = sweetSpot + 30
+                    if curMs <= aimAt then
                         st.fired = true
                         hits = hits + 1
-                        local dt = math.max(0, math.min((curMs - (st.target + inputLead)) / 1000, 0.08))
+                        local dt = 0
+                        if curMs >= sweetSpot then
+                            dt = math.clamp((curMs - sweetSpot) / 1000, 0, 0.08)
+                        end
                         task.delay(dt, function()
                             if not note.Parent then return end
                             pressKey(lane)
@@ -427,6 +431,18 @@ RunService.Heartbeat:Connect(function()
                                 end)
                             end
                         end)
+                    elseif crossing then
+                        st.fired = true
+                        hits = hits + 1
+                        pressKey(lane)
+                        if findHoldFrame(ar, note.Name) then
+                            startHold(lane, note.Name, ks)
+                        else
+                            task.spawn(function()
+                                RunService.Heartbeat:Wait()
+                                if not held[lane] then releaseKey(lane) end
+                            end)
+                        end
                     end
                 end
             end
