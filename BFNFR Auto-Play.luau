@@ -60,7 +60,6 @@ local antiAfk = true
 local mySide: number? = nil
 local speed = 1
 local dir = -1
-local perfectChance = 61
 local laneKeys: { [number]: Enum.KeyCode } = {}
 local speedLock = false
 local tracked = setmetatable({}, { __mode = "k" })
@@ -73,7 +72,19 @@ local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
 local PERFECT_CENTER = 8
 local SICK_CENTER = 30
-local inputLead = 20
+local MIX_PERFECT_CHANCE = 57
+local perfectChance = MIX_PERFECT_CHANCE
+local inputLead = 48
+local calibFile = "iwakewar_bfnfr_inputlead.txt"
+pcall(function()
+    local saved = readfile(calibFile)
+    local n = tonumber(saved)
+    if n then inputLead = math.clamp(n, 0, 90) end
+end)
+
+local function saveInputLead()
+    pcall(writefile, calibFile, string.format("%.1f", inputLead))
+end
 
 local rateCache = setmetatable({}, { __mode = "k" })
 
@@ -143,11 +154,34 @@ local function detectSide(): number?
 end
 
 local function pickTarget(): number
-    local chance = clampNum(perfectChance + math.random(-2, 1), 0, 100)
-    if math.random() <= chance / 100 then
+    if math.random() <= perfectChance / 100 then
         return PERFECT_CENTER
     end
     return SICK_CENTER
+end
+
+local calibLog = 0
+
+local function calibrate(target: number, pressCurMs: number, pressClock: number, note: Instance)
+    task.spawn(function()
+        for i = 1, 8 do
+            if not note.Parent then
+                local latMs = (os.clock() - pressClock) * 1000
+                local judged = pressCurMs - latMs
+                if calibLog < 40 then
+                    calibLog = calibLog + 1
+                    print(string.format("BFNFR | target=%d pressCurMs=%.1f latMs=%.1f judged=%.1f inputLead=%.1f", target, pressCurMs, latMs, judged, inputLead))
+                end
+                if math.abs(judged) <= 130.5 then
+                    local adj = math.clamp((target - judged) * 0.5, -6, 6)
+                    inputLead = clampNum(inputLead + adj, 0, 90)
+                    saveInputLead()
+                end
+                break
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end)
 end
 
 local function pressKey(lane: number)
@@ -210,6 +244,14 @@ local function resetRun()
     tracked = setmetatable({}, { __mode = "k" })
 end
 
+local function rerollTargets()
+    for note, st in pairs(tracked) do
+        if not st.fired then
+            st.target = pickTarget()
+        end
+    end
+end
+
 -- GUI elements
 local MainSection = Tabs.Main:AddSection("Main Functions")
 
@@ -262,15 +304,24 @@ MainSection:AddToggle("NoNotifications", {
     end,
 })
 
-MainSection:AddSlider("PerfectChance", {
-    Title = "Perfect chance",
-    Description = "Base chance for a Perfect; each note randomizes 59-62%",
-    Default = perfectChance,
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
-    Callback = function(Value)
-        perfectChance = Value
+MainSection:AddDropdown("PerfectMode", {
+    Title = "Perfect mode",
+    Description = "Never Perfect, mixed 57/43, or always Perfect",
+    Values = {
+        "Never Perfect",
+        "Mix (57% Perfect)",
+        "Always Perfect",
+    },
+    Default = "Mix (57% Perfect)",
+    Callback = function(value)
+        if value == "Never Perfect" then
+            perfectChance = 0
+        elseif value == "Always Perfect" then
+            perfectChance = 100
+        else
+            perfectChance = MIX_PERFECT_CHANCE
+        end
+        rerollTargets()
     end,
 })
 
@@ -286,7 +337,7 @@ MainSection:AddKeybind("ToggleKey", {
 
 Tabs.Info:AddParagraph({
     Title = "BFNFR Auto-Play",
-    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect chance randomizes 59-62%\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle.",
+    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle.",
 })
 
 Tabs.Info:AddButton({
@@ -333,6 +384,12 @@ task.spawn(function()
                     .. "  •  hits: " .. hits
             )
         end)
+        if enabled and inTrack and tick() % 2 < 1 then
+            print(string.format(
+                "BFNFR-counts | Perfect=%s Sick=%s Good=%s Bad=%s hits=%d target=%d inputLead=%.1f",
+                counts.Perfect, counts.Sick, counts.Good, counts.Bad, hits, perfectChance, inputLead
+            ))
+        end
     end
 end)
 
@@ -410,18 +467,10 @@ RunService.Heartbeat:Connect(function()
                         end
                         task.delay(dt, function()
                             if not note.Parent then return end
+                            local pressCurMs = math.abs(note.Position.Y.Scale) / (11 * speed) * 2000
                             pressKey(lane)
                             local pressClock = os.clock()
-                            task.spawn(function()
-                                for i = 1, 8 do
-                                    if not note.Parent then
-                                        local latMs = math.clamp((os.clock() - pressClock) * 1000, 0, 200)
-                                        inputLead = clampNum(inputLead + (latMs - inputLead) * 0.25, 0, 80)
-                                        break
-                                    end
-                                    RunService.Heartbeat:Wait()
-                                end
-                            end)
+                            calibrate(st.target, pressCurMs, pressClock, note)
                             if findHoldFrame(ar, note.Name) then
                                 startHold(lane, note.Name, ks)
                             else
@@ -434,7 +483,10 @@ RunService.Heartbeat:Connect(function()
                     elseif crossing then
                         st.fired = true
                         hits = hits + 1
+                        local pressCurMs = math.abs(scale) / (11 * speed) * 2000
                         pressKey(lane)
+                        local pressClock = os.clock()
+                        calibrate(st.target, pressCurMs, pressClock, note)
                         if findHoldFrame(ar, note.Name) then
                             startHold(lane, note.Name, ks)
                         else
@@ -451,3 +503,47 @@ RunService.Heartbeat:Connect(function()
 end)
 
 notify("BFNFR Auto-Play", "Loaded. Toggle with H.", 4)
+
+-- live note scroll-rate measurement: derive the game's real NoteSpeed
+-- (the server value always clamps to 0.8, which is wrong for most songs).
+-- Game judges off = 2000*|Y|/(11*v12); a note is 2000ms from the line
+-- when |Y| = 11*v12, so scroll rate r = 11*v12/2 scale/sec -> v12 = 2r/11.
+local speedMeas = nil
+RunService.Heartbeat:Connect(function()
+    if not enabled or not mf.Visible or not mySide then
+        speedMeas = nil
+        return
+    end
+    local ks = mf:FindFirstChild("KeySync" .. mySide)
+    if not ks then speedMeas = nil return end
+    local best = nil
+    for lane = 1, 4 do
+        local ar = ks:FindFirstChild("Arrow" .. lane)
+        local Notes = ar and ar:FindFirstChild("Notes")
+        if Notes then
+            for _, n in ipairs(Notes:GetChildren()) do
+                if n:IsA("ImageLabel") and n:GetAttribute("HoldHead") == true then
+                    local y = math.abs(n.Position.Y.Scale)
+                    if y >= 3 and y <= 60 then
+                        if not best or y < best.y then
+                            best = { n = n, y = y }
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if not best then speedMeas = nil return end
+    local now = os.clock()
+    if speedMeas and speedMeas.n == best.n then
+        local dt = now - speedMeas.t
+        if dt >= 0.008 then
+            local rate = (speedMeas.y - best.y) / dt
+            if rate > 0.3 and rate < 40 then
+                local s = math.clamp(2 * rate / 11, 0.8, 5)
+                speed = speed + (s - speed) * 0.3
+            end
+        end
+    end
+    speedMeas = { n = best.n, t = now, y = best.y }
+end)
