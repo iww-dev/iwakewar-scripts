@@ -67,6 +67,7 @@ local tracked = setmetatable({}, { __mode = "k" })
 local held = {}
 local lastJump = 0
 local hits = 0
+local noNotifications = false
 
 local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
@@ -221,6 +222,15 @@ local Live = Tabs.Main:AddParagraph({
     Content = "state: OFF • side: - • speed: - • hits: 0",
 })
 
+local function notify(title: string, content: string, duration: number)
+    if noNotifications then return end
+    Fluent:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration,
+    })
+end
+
 MainSection:AddToggle("Enabled", {
     Title = "Auto-Play",
     Description = "Toggle automatic key presses",
@@ -230,11 +240,7 @@ MainSection:AddToggle("Enabled", {
         if not enabled then
             resetRun()
         end
-        Fluent:Notify({
-            Title = "BFNFR Auto-Play",
-            Content = enabled and "Auto-Play enabled" or "Auto-Play disabled",
-            Duration = 2,
-        })
+        notify("BFNFR Auto-Play", enabled and "Auto-Play enabled" or "Auto-Play disabled", 2)
     end,
 })
 
@@ -244,6 +250,15 @@ MainSection:AddToggle("AntiAfk", {
     Default = true,
     Callback = function(state)
         antiAfk = state
+    end,
+})
+
+MainSection:AddToggle("NoNotifications", {
+    Title = "Do not send notifications",
+    Description = "Hide all Fluent notifications",
+    Default = false,
+    Callback = function(state)
+        noNotifications = state
     end,
 })
 
@@ -279,11 +294,7 @@ Tabs.Info:AddButton({
     Description = "Copy invite link to clipboard",
     Callback = function()
         local copied = copyToClipboard("https://discord.gg/GgshjzxxFS")
-        Fluent:Notify({
-            Title = "BFNFR Auto-Play",
-            Content = copied and "Discord link copied" or "No clipboard API on this executor",
-            Duration = 2,
-        })
+        notify("BFNFR Auto-Play", copied and "Discord link copied" or "No clipboard API on this executor", 2)
     end,
 })
 
@@ -343,11 +354,7 @@ RunService.Heartbeat:Connect(function()
     if not mySide then
         mySide = detectSide()
         if not mySide then return end
-        Fluent:Notify({
-            Title = "BFNFR Auto-Play",
-            Content = "Side detected: P" .. mySide .. " / speed " .. speed,
-            Duration = 3,
-        })
+        notify("BFNFR Auto-Play", "Side detected: P" .. mySide .. " / speed " .. speed, 3)
     end
     if antiAfk then
         local now = os.clock()
@@ -427,8 +434,4 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-Fluent:Notify({
-    Title = "BFNFR Auto-Play",
-    Content = "Loaded. Toggle with H.",
-    Duration = 4,
-})
+notify("BFNFR Auto-Play", "Loaded. Toggle with H.", 4)
