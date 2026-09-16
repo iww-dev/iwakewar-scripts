@@ -72,6 +72,7 @@ local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
 local PERFECT_CENTER = 8
 local SICK_CENTER = 30
+local NEVER_PERFECT_MARGIN = 15
 local MIX_PERFECT_CHANCE = 57
 local perfectChance = MIX_PERFECT_CHANCE
 local inputLead = 48
@@ -154,6 +155,9 @@ local function detectSide(): number?
 end
 
 local function pickTarget(): number
+    if perfectChance == 0 then
+        return SICK_CENTER + NEVER_PERFECT_MARGIN
+    end
     if math.random() <= perfectChance / 100 then
         return PERFECT_CENTER
     end
@@ -386,8 +390,8 @@ task.spawn(function()
         end)
         if enabled and inTrack and tick() % 2 < 1 then
             print(string.format(
-                "BFNFR-counts | Perfect=%s Sick=%s Good=%s Bad=%s hits=%d target=%d inputLead=%.1f",
-                counts.Perfect, counts.Sick, counts.Good, counts.Bad, hits, perfectChance, inputLead
+                "BFNFR-counts | Perfect=%s Sick=%s Good=%s Bad=%s hits=%d target=%d inputLead=%.1f speed=%.2f",
+                counts.Perfect, counts.Sick, counts.Good, counts.Bad, hits, perfectChance, inputLead, speed
             ))
         end
     end
