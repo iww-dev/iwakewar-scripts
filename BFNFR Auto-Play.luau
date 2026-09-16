@@ -71,11 +71,11 @@ local noNotifications = false
 local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
 local PERFECT_CENTER = 8
-local SICK_CENTER = 30
-local NEVER_PERFECT_MARGIN = 15
-local MIX_PERFECT_CHANCE = 57
+local SICK_CENTER = 31
+local NEVER_PERFECT_MARGIN = 16
+local MIX_PERFECT_CHANCE = 54
 local perfectChance = MIX_PERFECT_CHANCE
-local inputLead = 48
+local inputLead = 49
 local calibFile = "iwakewar_bfnfr_inputlead.txt"
 pcall(function()
     local saved = readfile(calibFile)
