@@ -70,10 +70,10 @@ local noNotifications = false
 
 local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
-local PERFECT_CENTER = 8
+local PERFECT_CENTER = 11
 local SICK_CENTER = 31
 local NEVER_PERFECT_MARGIN = 16
-local MIX_PERFECT_CHANCE = 43
+local MIX_PERFECT_CHANCE = 25
 local perfectChance = MIX_PERFECT_CHANCE
 local inputLead = 49
 local calibFile = "iwakewar_bfnfr_inputlead.txt"
