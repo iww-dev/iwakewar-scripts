@@ -49,6 +49,9 @@ end
 refreshZones()
 
 for _, g in ipairs(LP.PlayerGui:GetChildren()) do if g.Name == "FarmV4" or g.Name == "FarmV3" then g:Destroy() end end
+for _, g in ipairs(game:GetService("CoreGui"):GetChildren()) do if g.Name == "FarmToggle" then g:Destroy() end end
+local UIS = game:GetService("UserInputService")
+local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local genv0 = getgenv()
 if genv0.__farmFluent and type(genv0.__farmFluent.Destroy) == "function" then
   pcall(function() genv0.__farmFluent:Destroy() end)
@@ -59,7 +62,7 @@ local Window = Fluent:CreateWindow({
   Title = "StealAnEgg Farm",
   SubTitle = "by iwakewar team",
   TabWidth = 140,
-  Size = UDim2.fromOffset(520, 420),
+  Size = isPhone and UDim2.fromOffset(416, 336) or UDim2.fromOffset(520, 420),
   Acrylic = false,
   Theme = "Dark",
   MinimizeKey = Enum.KeyCode.RightControl,
@@ -69,6 +72,54 @@ local Tabs = {
   Main = Window:AddTab({ Title = "Farm", Icon = "" }),
 }
 Window:SelectTab(2)
+if isPhone then
+do
+  local sg = Instance.new("ScreenGui")
+  sg.Name = "FarmToggle" sg.ResetOnSpawn = false
+  pcall(function() sg.Parent = game:GetService("CoreGui") end)
+  if sg.Parent == nil then sg.Parent = LP.PlayerGui end
+  local b = Instance.new("TextButton")
+  b.Size = UDim2.fromOffset(40, 40)
+  b.Position = UDim2.new(0.5, -20, 0.5, -265)
+  b.Text = "F" b.TextSize = 18
+  b.BackgroundColor3 = Color3.fromRGB(30, 32, 40) b.TextColor3 = Color3.new(1, 1, 1)
+  b.Parent = sg
+  local cc = Instance.new("UICorner") cc.CornerRadius = UDim.new(0, 8) cc.Parent = b
+  local glow = Instance.new("UIStroke")
+  glow.Thickness = 2 glow.Color = Color3.fromRGB(0, 220, 255) glow.Transparency = 0.2
+  glow.Parent = b
+  task.spawn(function()
+    local ts = game:GetService("TweenService")
+    while b.Parent do
+      pcall(function()
+        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.7 }):Play()
+        task.wait(0.85)
+        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.2 }):Play()
+        task.wait(0.85)
+      end)
+    end
+  end)
+  local drag, ds, sp, moved = false, nil, nil, 0
+  b.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+      drag, ds, sp, moved = true, i.Position, b.Position, 0
+    end
+  end)
+  b.InputEnded:Connect(function() drag = false end)
+  UIS.InputChanged:Connect(function(i)
+    if drag and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
+      local d = i.Position - ds moved = d.Magnitude
+      b.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+    end
+  end)
+  b.Activated:Connect(function()
+    if moved < 12 then
+      local g = Fluent.GUI
+      if g then g.Enabled = not g.Enabled end
+    end
+  end)
+end
+end
 Tabs.Info:AddParagraph({
   Title = "StealAnEgg Farm",
   Content = "Full auto-farmer for Steal An Egg\nby iwakewar team\n\n- Steals eggs on foot (no teleports, anticheat-safe)\n- Instant escape the moment of steal\n- Places eggs on a free PetArea grid slot\n- Auto-hatches ready eggs, wears best pets\n- Upgrades treadmill, buys and equips trails\n- 1 minute on treadmill every 3 circles\n- Adaptive speedhack with server rollback control\n\nEnable Farm and watch the Log tab.",
