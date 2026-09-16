@@ -1,4 +1,4 @@
--- Autofarm v4: PetArea slots, instant-carry, Pathfinding, log panel, zero hardcode plots
+-- steal egg farm
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
@@ -9,9 +9,9 @@ local Treadmill = Remotes.Treadmill
 
 local cfg = { farm = false, margin = 1.08, speedMult = 1.15,
   placeEgg = true, treadBreak = true, upTread = true, upTrails = true,
-  wearBest = true, autoHatch = true } -- all features ON by default
+  wearBest = true, autoHatch = true }
 
--- ZONES WITHOUT HARDCODE: read RequiredSpeedSign tablets + Guards.Directory + Bounds positions live
+-- zones read from signs
 local function parseNum(s)
   s = tostring(s):gsub("%s+", ""):upper()
   local mult = 1
@@ -49,7 +49,6 @@ end
 refreshZones()
 
 for _, g in ipairs(LP.PlayerGui:GetChildren()) do if g.Name == "FarmV4" or g.Name == "FarmV3" then g:Destroy() end end
--- Fluent UI (local lib Scripts/_fluent.lua)
 local genv0 = getgenv()
 if genv0.__farmFluent and type(genv0.__farmFluent.Destroy) == "function" then
   pcall(function() genv0.__farmFluent:Destroy() end)
@@ -125,7 +124,6 @@ do
   local h0 = ch0 and ch0:FindFirstChildOfClass("Humanoid")
   if h0 and h0.WalkSpeed > 0 then baseWS = h0.WalkSpeed end
 end
--- heartbeat holder below, after hum()/alive() declaration (else nil-bug)
 
 local genv = getgenv()
 genv.__farmGen = (genv.__farmGen or 0) + 1
@@ -151,17 +149,17 @@ game:GetService("RunService").Heartbeat:Connect(function()
   if not hh or not rr then return end
   if cfg.speedMult <= 1.0 then baseWS = hh.WalkSpeed
   else
-    -- раз в ~5 сек отпускаем на тик чтобы подхватить серверный апгрейд скорости
+    -- resync base
     rbTick = (rbTick or 0) + 1
     if rbTick % 300 == 0 then baseWS = hh.WalkSpeed
     else
-      -- pulse: на x1.18 каждые 0.5с буст до x1.20 на 0.1с
+      -- pulse x1.20
       local eff = cfg.speedMult
       if math.abs(cfg.speedMult - 1.18) < 0.001 and (os.clock() % 0.5) < 0.1 then eff = 1.20 end
       pcall(function() hh.WalkSpeed = baseWS * eff end)
     end
   end
-  -- rollback watcher: logs server rubberbands, never lowers (auto-decrease removed)
+  -- rollback watch
   local now = os.clock()
   if now - rbLast >= 0.5 then
     rbLast = now
@@ -262,7 +260,6 @@ local function safeZones()
   return out
 end
 
--- direct walk (pathfinding removed: never arrived), only jump when stuck
 local function walkSmart(pos, timeout)
   if typeof(pos) ~= "Vector3" then return false end
   local h, r = hum(), hrp() if not h or not r then return false end
@@ -301,14 +298,11 @@ local function equipEgg()
   end end
 end
 
--- single-shot place (loop of 12 yielded and froze the thread): point under feet in CenterPoint space
--- + LMB click like the game (ghost confirms with click): mouse1click
 local function tryPlace(plot, uid)
   local cp = findKid(plot, "CenterPoint")
   if not cp then setPlace("no CenterPoint", false) return false end
   equipEgg()
   task.wait(0.3)
-  -- egg from inventory to hands like the game: WearEggTool (result to log)
   local wok, wokR = pcall(function()
     local EggState0 = require(RS.Client.EggState)
     return EggState0.WearEggTool(uid)
@@ -326,8 +320,7 @@ local function tryPlace(plot, uid)
     end
   end end
   addLog("Tool in hands: " .. tostring(toolNow) .. " uid=" .. tostring(toolUid and toolUid:sub(1, 8)), toolNow ~= nil)
-  if toolUid then uid = toolUid end -- server renames the egg after carry: place by tool uid
-  -- grid over WHOLE PetArea (step 12, 4 directions from center): nearest free, walk to it on foot
+  if toolUid then uid = toolUid end
   local pa = findKid(plot, "PetArea")
   local busy = {}
   local freshSet = {}
@@ -348,7 +341,6 @@ local function tryPlace(plot, uid)
       end
     end
   end)
-  -- re-check uid with fresh snapshot: stale (hatched/gone) = take another unplaced
   if not freshSet[uid] then
     local alt = nil
     for u, _ in pairs(freshSet) do alt = u break end
@@ -374,7 +366,6 @@ local function tryPlace(plot, uid)
     end
   end
   if not bestCF then setPlace("base full", false) return false end
-  -- walk to the cell on foot (game: canPlaceFromHere requires proximity)
   local targetW = (cp.CFrame * bestCF).Position
   if (Vector3.new(meP.X, 0, meP.Z) - Vector3.new(targetW.X, 0, targetW.Z)).Magnitude > 12 then
     walkSmart(Vector3.new(targetW.X, meP.Y, targetW.Z), 30)
@@ -386,7 +377,6 @@ local function tryPlace(plot, uid)
     local ok, a, b = pcall(function() return EggState.PlantEgg(uid, localCF) end)
     done, resA, resB = true, ok and a, b
   end)
-  -- NO click: clicks went into our centered UI; pure remote like the game's tryPlace
   local t0 = os.clock()
   while not done and os.clock() - t0 < 5 do task.wait(0.2) end
   if not done then setPlace("server timeout", false) return false end
@@ -396,7 +386,6 @@ local function tryPlace(plot, uid)
 end
 
 local function autoHatch()
-  -- auto-hatch: try Hatch->Finish on all own placed eggs, ready ones pop, unready wait
   local ok, res = pcall(function() return EggWorld.AskLiveSnapshot:InvokeServer() end)
   if not ok or type(res) ~= "table" then return end
   for _, t in pairs(res) do
@@ -448,9 +437,8 @@ task.spawn(function()
   local loopN = 0
   while alive() do
     loopN = loopN + 1
-    if loopN % 20 == 0 then refreshZones() end -- signs change: refresh zones on the fly
+    if loopN % 20 == 0 then refreshZones() end
     if cfg.farm and cfg.treadBreak and loopN % 3 == 0 then
-      -- every 3 circles: a minute on treadmill, NO jumps/exits
       local plot = myPlot()
       local tb = plot and findKid(plot, "TreadmillBottom")
       if tb then walkSmart(tb.Position + Vector3.new(0, 2, 0), 60) end
@@ -488,7 +476,7 @@ task.spawn(function()
       if #cands == 0 then
         local sl = {}
         for _, z in ipairs(safeZones()) do table.insert(sl, z.n) end
-        -- top zone and how far its nearest egg is (even beyond limit) - shows limit laziness
+        -- top zone distance check
         local topD, topN = nil, nil
         if ok and type(snap) == "table" and me then
           local safeReq = {}
@@ -505,12 +493,12 @@ task.spawn(function()
         end
         addLog("no eggs S=" .. mySpeed() .. " limit=" .. math.floor(maxWalk()) .. " nearest=" .. tostring(topN) .. ":" .. tostring(topD) .. " safe:" .. table.concat(sl, ","), nil)
         if plot then local tb = findKid(plot, "TreadmillBottom") local h = hrp() if tb and h and (h.Position - tb.Position).Magnitude > 25 then walkSmart(tb.Position, 60) end end
-        task.wait(12) -- stand on treadmill longer, gain speed
+        task.wait(12)
       else
         local c = cands[1]
         addLog("Going " .. math.floor(c.d) .. "st " .. c.r.AreaId .. " " .. c.r.Uid:sub(1, 6) .. " home=" .. (plot and plot.Name or "?"), nil)
         if walkSmart(c.bp + Vector3.new(0, 0, 4), 100) then
-          -- INSTANT: fire + carry-remote in task.spawn + run IMMEDIATELY, zero wait
+          -- instant steal, run at once
           local pr = findPrompt(c.bp)
           if pr then pcall(function() fireproximityprompt(pr) end) end
           task.spawn(function()
@@ -522,7 +510,7 @@ task.spawn(function()
           if h2 and home then h2:MoveTo(home.Position) end
           addLog("Running home!", nil)
           if home then walkSmart(home.Position, 120) end
-          -- check hands AFTER arriving; empty = wear ANY unplaced from inventory
+          -- hands check, wear any unplaced if empty
           local ch = LP.Character
           local hands = false
           if ch then for _, t in ipairs(ch:GetChildren()) do if t:IsA("Tool") and t.Name:lower():find("egg") then hands = true end end end
@@ -539,7 +527,7 @@ task.spawn(function()
           if not hands then
             setPlace("empty hands - carry denied, skip", false)
           else
-            -- server uid = new unplaced record (field uid invalid after carry)
+            -- fresh server uid
             local placeUid, afterSet = c.r.Uid, myUnplaced()
             for uid, _ in pairs(afterSet) do
               if not beforeSet[uid] then placeUid = uid break end

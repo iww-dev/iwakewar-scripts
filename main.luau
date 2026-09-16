@@ -12,6 +12,18 @@ local GAME_INFO = {
         name = "Basically FNF: Remix",
         script = "BFNFR Auto-Play.luau",
     },
+    ["107778070777162"] = {
+        name = "Steal An Egg",
+        script = "StealAnEgg.luau",
+    },
+}
+
+-- universe fallback (same game, different places)
+local UNIVERSE_INFO = {
+    ["10563114921"] = {
+        name = "Steal An Egg",
+        script = "StealAnEgg.luau",
+    },
 }
 
 local function escapeUrl(path: string): string
@@ -55,6 +67,21 @@ local function runSource(src: string, name: string): boolean
         return false
     end
     return true
+end
+
+local function detectGame()
+    local placeId = tostring(game.PlaceId or "")
+    local info = GAME_INFO[placeId]
+    if info then
+        return info, placeId
+    end
+    local ok, uid = pcall(function()
+        return tostring(game.GameId or "")
+    end)
+    if ok and uid ~= "" and UNIVERSE_INFO[uid] then
+        return UNIVERSE_INFO[uid], ("universe " .. uid)
+    end
+    return nil, placeId
 end
 
 local function buildSplash()
@@ -231,10 +258,9 @@ local function buildSplash()
 end
 
 local function runWithoutSplash()
-    local placeId = tostring(game.PlaceId or "")
-    local info = GAME_INFO[placeId]
+    local info, idShown = detectGame()
     if not info then
-        warn("[iwakewar-scripts] This game is not supported (place " .. placeId .. ")")
+        warn("[iwakewar-scripts] This game is not supported (place " .. tostring(idShown) .. ")")
         return
     end
     local src = fetch(BASE .. escapeUrl(info.script))
@@ -252,14 +278,13 @@ local function loadWithSplash(ui)
     ui.progress(0.2, "Detecting game...")
     task.wait(0.2)
 
-    local placeId = tostring(game.PlaceId or "")
-    local info = GAME_INFO[placeId]
+    local info, idShown = detectGame()
 
     if not info then
-        ui.setGame("Unknown (" .. placeId .. ")", false)
+        ui.setGame("Unknown (" .. tostring(idShown) .. ")", false)
         ui.fail("This game is not supported by iwakewar-scripts (yet).")
         ui.showClose()
-        warn("[iwakewar-scripts] unsupported game, place " .. placeId)
+        warn("[iwakewar-scripts] unsupported game, place " .. tostring(idShown))
         return
     end
 
