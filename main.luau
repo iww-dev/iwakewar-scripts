@@ -16,6 +16,10 @@ local GAME_INFO = {
         name = "Steal An Egg",
         script = "StealAnEgg.luau",
     },
+    ["142823291"] = {
+        name = "Murder Mystery 2",
+        script = "MM2.luau",
+    },
 }
 
 -- universe fallback (same game, different places)
@@ -23,6 +27,10 @@ local UNIVERSE_INFO = {
     ["10563114921"] = {
         name = "Steal An Egg",
         script = "StealAnEgg.luau",
+    },
+    ["66654135"] = {
+        name = "Murder Mystery 2",
+        script = "MM2.luau",
     },
 }
 
