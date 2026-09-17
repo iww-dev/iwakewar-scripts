@@ -10,15 +10,15 @@ local BASE = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/he
 local GAME_INFO = {
     ["6520999642"] = {
         name = "Basically FNF: Remix",
-        script = "BFNFR Auto-Play.luau",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau",
     },
     ["107778070777162"] = {
         name = "Steal An Egg",
-        script = "StealAnEgg.luau",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/StealAnEgg.luau",
     },
     ["142823291"] = {
         name = "Murder Mystery 2",
-        script = "MM2.luau",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
     },
 }
 
@@ -253,12 +253,12 @@ local function runWithoutSplash()
         warn("[iwakewar-scripts] This game is not supported (place " .. tostring(idShown) .. ")")
         return
     end
-    local src = fetch(BASE .. escapeUrl(info.script))
+    local src = fetch(info.url)
     if not src then
-        warn("[iwakewar-scripts] could not fetch " .. info.script)
+        warn("[iwakewar-scripts] could not fetch " .. info.url)
         return
     end
-    runSource(src, info.script)
+    runSource(src, info.name)
 end
 
 local function loadWithSplash(ui)
@@ -280,10 +280,10 @@ local function loadWithSplash(ui)
 
     ui.setGame(info.name, true)
 
-    ui.progress(0.45, "Downloading " .. info.script .. "...")
+    ui.progress(0.45, "Downloading " .. info.name .. "...")
     task.wait(0.2)
 
-    local url = BASE .. escapeUrl(info.script)
+    local url = info.url
     local src = fetch(url)
     if not src then
         ui.fail("Failed to download script. Check your connection.")
@@ -295,7 +295,7 @@ local function loadWithSplash(ui)
     ui.progress(0.8, "Injecting...")
     task.wait(0.2)
 
-    local okRun = runSource(src, info.script)
+    local okRun = runSource(src, info.name)
     if okRun then
         ui.progress(1, "Done! Enjoy.")
         task.delay(1.2, function()
