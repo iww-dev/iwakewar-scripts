@@ -22,18 +22,6 @@ local GAME_INFO = {
     },
 }
 
--- universe fallback (same game, different places)
-local UNIVERSE_INFO = {
-    ["10563114921"] = {
-        name = "Steal An Egg",
-        script = "StealAnEgg.luau",
-    },
-    ["66654135"] = {
-        name = "Murder Mystery 2",
-        script = "MM2.luau",
-    },
-}
-
 local function escapeUrl(path: string): string
     return (path:gsub(" ", "%%20"))
 end
@@ -82,12 +70,6 @@ local function detectGame()
     local info = GAME_INFO[placeId]
     if info then
         return info, placeId
-    end
-    local ok, uid = pcall(function()
-        return tostring(game.GameId or "")
-    end)
-    if ok and uid ~= "" and UNIVERSE_INFO[uid] then
-        return UNIVERSE_INFO[uid], ("universe " .. uid)
     end
     return nil, placeId
 end
