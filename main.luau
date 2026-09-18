@@ -20,6 +20,14 @@ local GAME_INFO = {
         name = "Murder Mystery 2",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
     },
+    ["6839171747"] = {
+        name = "DOORS",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Doors.luau",
+    },
+    ["9872472334"] = {
+        name = "Evade",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Evade.luau",
+    },
 }
 
 local function escapeUrl(path: string): string
