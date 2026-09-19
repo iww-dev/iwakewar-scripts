@@ -28,6 +28,14 @@ local GAME_INFO = {
         name = "Evade",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Evade.luau",
     },
+    ["123907164579958"] = {
+        name = "Hidden Within",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/HW.luau",
+    },
+    ["537413528"] = {
+        name = "Build A Boat For Treasure",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BABFT.luau",
+    },
 }
 
 local function escapeUrl(path: string): string
