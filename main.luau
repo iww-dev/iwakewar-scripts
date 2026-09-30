@@ -145,6 +145,7 @@ local function buildSplash()
     local C_CONSOLE = Color3.fromRGB(5, 5, 5)
 
     local lastError: string? = nil
+    local failed = false
 
     local sgui = Instance.new("ScreenGui")
     sgui.Name = "iwakewar-scripts"
@@ -375,6 +376,7 @@ local function buildSplash()
 
     ui.stopMarquee = function(ok: boolean)
         marqueeOn = false
+        barBG.Visible = true
         if ok then
             -- успех: залить весь бар зелёным
             chunk.Position = UDim2.fromScale(0, 0)
@@ -402,6 +404,7 @@ local function buildSplash()
     end
 
     ui.fail = function(msg: string, detail: string?)
+        failed = true
         local full = msg
         if detail and #detail > 0 then
             full = msg .. " | " .. detail
@@ -424,8 +427,16 @@ local function buildSplash()
         closeBtn.Visible = true
     end
 
+    -- Ручное закрытие (кнопка Close) работает всегда.
+    -- Автозакрытие по успеху проверяет флаг и не срабатывает после fail.
     ui.close = function()
-        sgui:Destroy()
+        if sgui.Parent then
+            sgui:Destroy()
+        end
+    end
+
+    ui.didFail = function(): boolean
+        return failed
     end
 
     ui.getError = function(): string?
@@ -535,7 +546,10 @@ local function loadWithSplash(ui)
     if okRun then
         ui.ok("done! enjoy.")
         task.delay(1.2, function()
-            ui.close()
+            -- если за это время случился fail -- не закрываемся
+            if not ui.didFail() then
+                ui.close()
+            end
         end)
     else
         ui.fail("Script errored.", tostring(rerr))
