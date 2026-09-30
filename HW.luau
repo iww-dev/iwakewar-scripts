@@ -9,12 +9,61 @@ local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local cfg = { esp = true, aimbot = true, maxDist = 50, speed = 34, hitbox = true, hitboxSize = 1.4, gundis = true, god = false }
 local gunOrig = nil
 
-local genv0 = getgenv()
+-- Executor-safe env access (Delta has getgenv, but guard anyway)
+local function getG()
+  if typeof(getgenv) == "function" then
+    local ok, g = pcall(getgenv)
+    if ok and typeof(g) == "table" then return g end
+  end
+  return _G
+end
+local genv0 = getG()
 if genv0.__hwFluent and type(genv0.__hwFluent.Destroy) == "function" then
   pcall(function() genv0.__hwFluent:Destroy() end)
 end
-local Fluent = loadstring(readfile("_fluent.lua"))()
+-- Fluent loader with fallback: BFNFR-style.
+-- Было: loadstring(readfile("_fluent.lua"))() -- падает на Delta,
+-- если файла нет в workspace (readfile кидает ошибку и весь скрипт умирает молча).
+local function loadFluent()
+  local src = nil
+  local okR, resR = pcall(function() return readfile("_fluent.lua") end)
+  if okR and typeof(resR) == "string" and #resR > 1000 then
+    src = resR
+  else
+    local okH, resH = pcall(function()
+      return game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua", true)
+    end)
+    if okH and typeof(resH) == "string" and #resH > 1000 then
+      src = resH
+      -- закэшировать для следующего запуска (не критично если не выйдет)
+      pcall(writefile, "_fluent.lua", src)
+    end
+  end
+  if not src or #src < 1000 then
+    error("Fluent source could not be loaded (no _fluent.lua and HttpGet fallback failed). "
+      .. "Put _fluent.lua next to the script or allow HttpGet.")
+  end
+  if typeof(loadstring) ~= "function" then
+    error("loadstring() missing on this executor")
+  end
+  local fn, err = loadstring(src)
+  if not fn then error("Fluent compile error: " .. tostring(err)) end
+  return fn()
+end
+local Fluent = loadFluent()
 genv0.__hwFluent = Fluent
+-- Drawing есть не везде (на части мобильных сборок Delta обрезан) -- ESP без него не работает
+local hasDrawing = typeof(Drawing) == "table" and typeof(Drawing.new) == "function"
+if not hasDrawing then
+  cfg.esp = false
+  task.spawn(function()
+    task.wait(1)
+    pcall(function()
+      Fluent:Notify({ Title = "Hidden Within", Content = "Drawing API missing: ESP disabled", Duration = 5 })
+    end)
+    warn("[HW] Drawing API missing on this executor, ESP disabled")
+  end)
+end
 local Window = Fluent:CreateWindow({
   Title = "Hidden Within",
   SubTitle = "by iwakewar team",
@@ -169,10 +218,10 @@ end
 local godTog = Tabs.Main:AddToggle("GodTog", { Title = "Godmode", Description = "Server gets fake hitbox position", Default = false })
 godTog:OnChanged(function() cfg.god = godTog.Value end)
 
-local genv = getgenv()
+local genv = getG()
 genv.__hwGen = (genv.__hwGen or 0) + 1
 local myGen = genv.__hwGen
-STATE = STATE or {}
+if typeof(STATE) ~= "table" then STATE = {} end
 local running = true
 if STATE.onCleanup then STATE.onCleanup(function() running = false end) end
 local function alive()
@@ -221,7 +270,7 @@ if STATE.onCleanup then STATE.onCleanup(clearDrawings) end
 task.spawn(function()
   while alive() do
     RS.RenderStepped:Wait()
-    if not cfg.esp then
+    if not cfg.esp or not hasDrawing then
       if #drawings > 0 then clearDrawings() end
       continue
     end
@@ -247,7 +296,8 @@ task.spawn(function()
       end
     end
     while #drawings < #want do
-      local t = Drawing.new("Text")
+      local okD, t = pcall(Drawing.new, "Text")
+      if not okD or not t then break end
       t.Size = 14 t.Center = true t.Outline = true
       t.Font = 2
       table.insert(drawings, t)
@@ -308,7 +358,8 @@ task.spawn(function()
     if isPhone then
       engage = true
     else
-      engage = UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+      local okM, pressed = pcall(UIS.IsMouseButtonPressed, UIS, Enum.UserInputType.MouseButton2)
+      engage = okM and pressed or false
     end
     if not engage then
       lockedUid, lockedPos, invalidSince = nil, nil, nil
@@ -341,11 +392,22 @@ end)
 log("ready")
 
 -- Godmode: lie to ALL server hitbox queries (one handler per player, hook them all)
+-- Требует filtergc + hookfunction + debug.info. На Delta их может не быть --
+-- тогда тогл просто пишет в лог, а не роняет скрипт.
 local godHooks = {}
+local hasHookEnv = typeof(filtergc) == "function"
+  and typeof(hookfunction) == "function"
+  and typeof(debug) == "table" and typeof(debug.info) == "function"
 local function setGodmode(on)
+  if not hasHookEnv then
+    log("godmode unsupported on this executor (no hookfunction/filtergc)")
+    return
+  end
   if on then
     local n = 0
-    for _, f in filtergc("function", {}, false) do
+    local okG, gc = pcall(filtergc, "function", {}, false)
+    if not okG or typeof(gc) ~= "table" then log("godmode scan failed") return end
+    for _, f in ipairs(gc) do
       local okS, src = pcall(debug.info, f, "s")
       local _, ln = pcall(debug.info, f, "l")
       if okS and type(src) == "string" and string.find(src, "HitboxController", 1, true) and ln == 15 and not godHooks[f] then
@@ -429,7 +491,7 @@ task.spawn(function()
             t.Range = 2000
             t.ReloadTime = 0.1
             t.Auto = true
-            if t.RecoilForce ~= nil then t.RecoilForce = Vector3.zero end
+            if t.RecoilForce ~= nil then t.RecoilForce = Vector3.new(0, 0, 0) end
           end
         end
         log("guns maxed")
