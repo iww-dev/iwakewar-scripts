@@ -1,0 +1,1 @@
+local btn = game.Players.LocalPlayer.PlayerGui.LaunchBoatGui.PromptLaunch.Yes for _, c in ipairs(getconnections(btn.MouseButton1Click)) do pcall(function() c.Function() end) end return "fired"
