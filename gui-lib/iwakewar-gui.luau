@@ -119,6 +119,370 @@ function GUI:Notify(cfg)
     end)
 end
 
+-- close hooks registered by scripts: table.insert(GUI._onClose, fn)
+GUI._onClose = {}
+-- self url for `reload`: scripts set GUI._selfUrl = "https://...raw.../script.luau"
+GUI._selfUrl = nil
+GUI._t0 = os.clock()
+
+local function fmtDur(s)
+    s = math.max(0, math.floor(s))
+    local h = math.floor(s / 3600)
+    local m = math.floor((s % 3600) / 60)
+    local ss = s % 60
+    if h > 0 then return string.format("%dh %02dm %02ds", h, m, ss) end
+    if m > 0 then return string.format("%dm %02ds", m, ss) end
+    return string.format("%ds", ss)
+end
+
+-- rock state
+local rockOn = false
+local rockSaved = {}
+local rockBoxes = {}
+
+local function rockSet(on, say)
+    local c = LP.Character
+    if not c then
+        say("no character", false)
+        return
+    end
+    if on == rockOn then
+        say(rockOn and "already rock" or "already flesh")
+        return
+    end
+    rockOn = on
+    if on then
+        rockSaved = {}
+        for _, v in ipairs(c:GetDescendants()) do
+            if v:IsA("BasePart") then
+                rockSaved[v] = { v.Material, v.Color, v.Transparency }
+                v.Material = Enum.Material.Slate
+                v.Color = Color3.fromRGB(110, 110, 115)
+            elseif v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") then
+                rockSaved[v] = { "cloth" }
+                v.Transparency = 1
+            elseif v:IsA("Accessory") then
+                local h = v:FindFirstChild("Handle")
+                if h and h:IsA("BasePart") then
+                    rockSaved[h] = { h.Material, h.Color, h.Transparency }
+                    h.Material = Enum.Material.Slate
+                    h.Color = Color3.fromRGB(90, 90, 95)
+                end
+            elseif v:IsA("Decal") and v.Parent and v.Parent.Name == "Head" then
+                rockSaved[v] = { "face", v.Transparency }
+                v.Transparency = 1
+            end
+        end
+        -- широкая collide-коробка: толкаемся с дистанции, ходим/прыгаем как раньше
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, sz in ipairs({ Vector3.new(8, 6, 4) }) do
+                local b = Instance.new("Part")
+                b.Name = "iwkRockBox"
+                b.Size = sz
+                b.Transparency = 1
+                b.CanCollide = true
+                b.Massless = true
+                b.CanQuery = false
+                b.CanTouch = false
+                b.CFrame = hrp.CFrame
+                b.Parent = c
+                local w = Instance.new("WeldConstraint")
+                w.Part0 = hrp
+                w.Part1 = b
+                w.Parent = b
+                table.insert(rockBoxes, b)
+            end
+        end
+        say("rock mode ON (slate + wide collide)", true)
+    else
+        for inst, s in pairs(rockSaved) do
+            pcall(function()
+                if inst and inst.Parent then
+                    if s[1] == "cloth" then
+                        inst.Transparency = 0
+                    elseif s[1] == "face" then
+                        inst.Transparency = s[2]
+                    else
+                        inst.Material, inst.Color, inst.Transparency = s[1], s[2], s[3]
+                    end
+                end
+            end)
+        end
+        rockSaved = {}
+        for _, b in ipairs(rockBoxes) do
+            pcall(function() b:Destroy() end)
+        end
+        rockBoxes = {}
+        say("rock mode OFF", true)
+    end
+end
+
+local function buildTerminal(Window)
+    local tab = Window:AddTab({ Title = "Terminal" })
+    local page = tab.page
+    local out = Instance.new("ScrollingFrame")
+    out.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+    out.BorderSizePixel = 0
+    out.Position = UDim2.new(0, 0, 0, 0)
+    out.Size = UDim2.new(1, 0, 1, -34)
+    out.ScrollBarThickness = 3
+    out.ScrollBarImageColor3 = C_LINE
+    out.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    out.CanvasSize = UDim2.new(0, 0, 0, 0)
+    out.Parent = page
+    stroke(out, Color3.fromRGB(50, 50, 50))
+    local lay = Instance.new("UIListLayout")
+    lay.FillDirection = Enum.FillDirection.Vertical
+    lay.Padding = UDim.new(0, 2)
+    lay.SortOrder = Enum.SortOrder.LayoutOrder
+    lay.Parent = out
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingLeft = UDim.new(0, 7)
+    pad.PaddingRight = UDim.new(0, 7)
+    pad.PaddingBottom = UDim.new(0, 5)
+    pad.Parent = out
+    local inp = Instance.new("TextBox")
+    inp.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+    inp.BorderSizePixel = 0
+    inp.Font = F
+    inp.Text = ""
+    inp.PlaceholderText = "help"
+    inp.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
+    inp.TextColor3 = C_GREEN
+    inp.TextSize = 13
+    inp.TextXAlignment = Enum.TextXAlignment.Left
+    inp.ClearTextOnFocus = false
+    inp.Position = UDim2.new(0, 0, 1, -30)
+    inp.Size = UDim2.new(1, 0, 0, 30)
+    inp.Parent = page
+    stroke(inp, Color3.fromRGB(50, 50, 50))
+    local n = 0
+    local function scrollDown()
+        task.defer(function()
+            pcall(function()
+                out.CanvasPosition = Vector2.new(0, math.max(0, out.AbsoluteCanvasSize.Y - out.AbsoluteWindowSize.Y))
+            end)
+        end)
+    end
+    local function line(t, color)
+        n = n + 1
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Font = F
+        l.Text = tostring(t)
+        l.TextSize = 12
+        l.TextColor3 = color or C_DIMTXT
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextWrapped = true
+        l.AutomaticSize = Enum.AutomaticSize.Y
+        l.Size = UDim2.new(1, 0, 0, 15)
+        l.LayoutOrder = n
+        l.Parent = out
+        scrollDown()
+    end
+    local say = function(t) line(t, C_DIMTXT) end
+    local ok2 = function(t) line(t, C_GREEN) end
+    local err = function(t) line(t, C_RED) end
+
+    local cmds = {}
+
+    cmds.help = function()
+        ok2("commands: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet")
+        say("aliases: i-want-to-be-a-rock, closentire, close-entire, re, st, tr")
+    end
+
+    cmds.executor = function()
+        local name = nil
+        pcall(function()
+            if typeof(identifyexecutor) == "function" then name = identifyexecutor() end
+        end)
+        if not name then
+            pcall(function()
+                if typeof(getexecutorname) == "function" then name = getexecutorname() end
+            end)
+        end
+        ok2("executor: " .. tostring(name or "unknown"))
+    end
+
+    cmds.game = function()
+        say("placeId: " .. tostring(game.PlaceId))
+        say("universeId: " .. tostring(game.GameId))
+        say("jobId: " .. tostring(game.JobId))
+        say("players: " .. #Players:GetPlayers())
+        local nm = nil
+        pcall(function()
+            nm = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+        end)
+        say("place: " .. tostring(nm or game.Name))
+    end
+
+    cmds.playtime = function()
+        local srv = nil
+        pcall(function() srv = workspace:GetServerTimeNow() end)
+        if type(srv) ~= "number" then
+            pcall(function() srv = workspace.DistributedGameTime end)
+        end
+        say("server playtime: " .. (type(srv) == "number" and fmtDur(srv) or "unknown"))
+        say("script uptime: " .. fmtDur(os.clock() - GUI._t0))
+    end
+
+    cmds["i-want-to-be-a-rock"] = function(arg)
+        if arg == "on" then rockSet(true, say)
+        elseif arg == "off" then rockSet(false, say)
+        else rockSet(not rockOn, say) end
+    end
+    cmds["iw-barock"] = cmds["i-want-to-be-a-rock"]
+
+    local function fullClose()
+        GUI.Unloaded = true
+        for _, fn in ipairs(GUI._onClose) do pcall(fn) end
+        pcall(function()
+            local c = LP.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.Anchored = false end
+        end)
+        pcall(function() workspace.Gravity = 196.2 end)
+        if rockOn then rockSet(false, function() end) end
+        pcall(function() GUI.GUI:Destroy() end)
+        pcall(function()
+            local cg = game:GetService("CoreGui"):FindFirstChild("iwkToggle")
+            if cg then cg:Destroy() end
+        end)
+        print("[iwk] closed entirely")
+    end
+    cmds["close-entire"] = fullClose
+    cmds["closentire"] = fullClose
+    cmds["ce"] = fullClose
+
+    cmds.loadstring = function(arg)
+        if not arg or arg == "" then err("usage: loadstring <url|code>") return end
+        task.spawn(function()
+            local src = arg
+            if arg:match("^https?://") then
+                local ok, res = pcall(function() return game:HttpGet(arg) end)
+                if not ok then err("http failed") return end
+                src = res
+            end
+            local fn, e = loadstring(src)
+            if not fn then err("compile: " .. tostring(e)) return end
+            local ok, r = pcall(fn)
+            ok2(ok and ("done -> " .. tostring(r)) or ("runtime: " .. tostring(r)))
+        end)
+    end
+
+    local function doReload()
+        local url = GUI._selfUrl
+        if not url or url == "" then
+            err("reload: script did not set GUI._selfUrl")
+            return
+        end
+        say("reloading from " .. url .. " ...")
+        task.spawn(function()
+            GUI.Unloaded = true
+            for _, fn in ipairs(GUI._onClose) do pcall(fn) end
+            pcall(function() GUI.GUI:Destroy() end)
+            task.wait(0.5)
+            local ok, src = pcall(function() return game:HttpGet(url) end)
+            if not ok then warn("[iwk] reload http failed") return end
+            local fn, e = loadstring(src)
+            if not fn then warn("[iwk] reload compile: " .. tostring(e)) return end
+            task.spawn(fn)
+        end)
+    end
+    cmds.rexecute = doReload
+    cmds.restart = doReload
+    cmds.reload = doReload
+    cmds.re = doReload
+    cmds["re-execute"] = doReload
+
+    cmds["set-timer"] = function(arg)
+        local s = tonumber(arg)
+        if not s or s <= 0 then err("usage: timer <seconds>") return end
+        ok2("timer set: " .. s .. "s")
+        task.delay(s, function()
+            for i = 1, 5 do
+                GUI:Notify({ Title = "TIMER", Content = "TIMER ENDED", Duration = 3 })
+                task.wait(0.45)
+            end
+        end)
+    end
+    cmds.timer = cmds["set-timer"]
+    cmds.st = cmds["set-timer"]
+
+    cmds.ping = function(arg)
+        if not arg or arg == "" then err("usage: ping <host>") return end
+        local a = string.lower(arg)
+        if a == "roblox" or a:match("^roblox%.com") then
+            say("measuring place ping 10s ...")
+            task.spawn(function()
+                local sum, n = 0, 0
+                for i = 1, 10 do
+                    local ok, v = pcall(function()
+                        return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+                    end)
+                    if ok and typeof(v) == "number" then sum, n = sum + v, n + 1 end
+                    task.wait(1)
+                end
+                if n > 0 then ok2(string.format("roblox ping: %.0f ms (avg %d samples)", sum / n, n))
+                else err("ping unknown") end
+            end)
+            return
+        end
+        task.spawn(function()
+            local url = arg:match("^https?://") and arg or ("https://" .. arg)
+            local t0 = os.clock()
+            local ok = pcall(function() game:HttpGet(url) end)
+            if ok then ok2(string.format("%s: %.0f ms (http)", arg, (os.clock() - t0) * 1000))
+            else err("ping unknown") end
+        end)
+    end
+
+    cmds.testraknet = function()
+        if typeof(RakNet) == "table" then
+            local fns = {}
+            pcall(function()
+                for k, v in pairs(RakNet) do
+                    if typeof(v) == "function" then table.insert(fns, k) end
+                end
+            end)
+            ok2("RakNet: available (" .. #fns .. " funcs: " .. table.concat(fns, ", "):sub(1, 120) .. ")")
+        else
+            err("RakNet: not available here")
+        end
+    end
+    cmds["test-raknet"] = cmds.testraknet
+    cmds.raknet = cmds.testraknet
+    cmds.tr = cmds.testraknet
+
+    local function run(raw)
+        line("root@alpine:~# " .. raw, C_GREEN)
+        local cmd, arg = raw:match("^(%S+)%s*(.-)%s*$")
+        if not cmd then return end
+        cmd = string.lower(cmd)
+        local fn = cmds[cmd]
+        if fn then
+            local ok, e = pcall(fn, arg)
+            if not ok then err("error: " .. tostring(e)) end
+        else
+            err("unknown: " .. cmd .. " (help)")
+        end
+    end
+
+    inp.FocusLost:Connect(function(enter)
+        if not enter then return end
+        local t = inp.Text
+        inp.Text = ""
+        if t and t ~= "" then
+            task.spawn(run, t)
+        end
+    end)
+
+    line("iwakewar terminal tty0 — type help", C_DGREEN)
+    return tab
+end
+
 function GUI:CreateWindow(wcfg)
     wcfg = wcfg or {}
     local title = wcfg.Title or "iwakewar"
@@ -248,7 +612,7 @@ function GUI:CreateWindow(wcfg)
         for _, tb in ipairs(self._tabs) do
             tb.page.Visible = (tb == t)
             tb.btn.TextColor3 = (tb == t) and C_GREEN or C_TXT
-            tb.btn.Text = ((tb == t) and "> " or "  ") .. tb.name
+            if tb.bar then tb.bar.Visible = (tb == t) end
         end
     end
 
@@ -260,11 +624,19 @@ function GUI:CreateWindow(wcfg)
         b.TextXAlignment = Enum.TextXAlignment.Left
         b.TextWrapped = true
         local bp = Instance.new("UIPadding")
-        bp.PaddingLeft = UDim.new(0, 10)
+        bp.PaddingLeft = UDim.new(0, 18)
         bp.PaddingRight = UDim.new(0, 6)
         bp.PaddingTop = UDim.new(0, 6)
         bp.PaddingBottom = UDim.new(0, 6)
         bp.Parent = b
+        -- зелёная полоска активного таба: вылезает на 3px левее кнопки
+        local bar2 = Instance.new("Frame")
+        bar2.BackgroundColor3 = C_GREEN
+        bar2.BorderSizePixel = 0
+        bar2.Position = UDim2.new(0, -10, 0, 0)
+        bar2.Size = UDim2.new(0, 3, 1, 0)
+        bar2.Visible = false
+        bar2.Parent = b
         local page = Instance.new("ScrollingFrame")
         page.BackgroundTransparency = 1
         page.BorderSizePixel = 0
@@ -284,7 +656,7 @@ function GUI:CreateWindow(wcfg)
         pad.PaddingTop = UDim.new(0, 2)
         pad.PaddingRight = UDim.new(0, 6)
         pad.Parent = page
-        local tab = { name = name, btn = b, page = page, _win = self }
+        local tab = { name = name, btn = b, page = page, _win = self, bar = bar2 }
         b.MouseButton1Click:Connect(function()
             for i, tb in ipairs(self._tabs) do
                 if tb == tab then self:SelectTab(i) break end
@@ -793,12 +1165,192 @@ function GUI:CreateWindow(wcfg)
         end)
     end
 
+    -- terminal tab: всегда последняя, максимально снизу
+    task.defer(function()
+        if GUI.Unloaded then return end
+        pcall(function()
+            buildTerminal(Window)
+            if #Window._tabs > 0 and (Window._sel == nil or Window._sel == Window._tabs[1]) then
+                -- не трогаем выбор скрипта; терминал просто в конце списка
+            end
+        end)
+    end)
+
     return Window
 end
 
 -- keybind mode reader (modes stored per keybind object)
 function kcfg_mode(k)
     return (k and k._mode) or "Toggle"
+end
+
+-- ============ LOADER MODE ============
+-- Отдельный режим под лоадер: как main.luau, но на стилях либы.
+-- local L = GUI:Loader({ title = "> iwakewar-scripts_" })
+-- L.log("boot...") L.startMarquee() L.stopMarquee(true) L.fail(msg) L.ok(msg)
+-- L.showClose() L.close()
+function GUI:Loader(ocfg)
+    ocfg = ocfg or {}
+    local title = ocfg.title or "> iwakewar-scripts_"
+    local sub = ocfg.sub or "[loader v2] :: terminal"
+    local sgui = Instance.new("ScreenGui")
+    sgui.Name = ocfg.name or "iwakewar-loader"
+    sgui.DisplayOrder = 100
+    sgui.IgnoreGuiInset = true
+    sgui.ResetOnSpawn = false
+    pcall(function() sgui.Parent = game:GetService("CoreGui") end)
+    if sgui.Parent == nil then sgui.Parent = LP:WaitForChild("PlayerGui") end
+    if ocfg.dim ~= false then
+        local dim = Instance.new("Frame")
+        dim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        dim.BorderSizePixel = 0
+        dim.Size = UDim2.fromScale(1, 1)
+        dim.Parent = sgui
+    end
+    local win = Instance.new("Frame")
+    win.AnchorPoint = Vector2.new(0.5, 0.5)
+    win.BackgroundColor3 = C_PANEL
+    win.BorderSizePixel = 0
+    win.Position = UDim2.fromScale(0.5, 0.5)
+    win.Size = UDim2.fromOffset(480, 400)
+    win.Parent = sgui
+    stroke(win)
+    local inner = Instance.new("Frame")
+    inner.BackgroundTransparency = 1
+    inner.AnchorPoint = Vector2.new(0.5, 0.5)
+    inner.Position = UDim2.fromScale(0.5, 0.5)
+    inner.Size = UDim2.new(1, -8, 1, -8)
+    inner.Parent = win
+    stroke(inner, Color3.fromRGB(38, 38, 38))
+    local accent = Instance.new("Frame")
+    accent.BackgroundColor3 = C_GREEN
+    accent.BorderSizePixel = 0
+    accent.Size = UDim2.new(1, 0, 0, 2)
+    accent.Parent = win
+    local tt = label(win, title, 18, C_TXT)
+    tt.Position = UDim2.new(0, 12, 0, 10)
+    tt.Size = UDim2.new(1, -150, 0, 24)
+    local tty = label(win, "root@alpine:~#", 11, Color3.fromRGB(90, 90, 90), Enum.TextXAlignment.Right)
+    tty.Position = UDim2.new(1, -140, 0, 12)
+    tty.Size = UDim2.new(0, 128, 0, 16)
+    local sb = label(win, sub, 13, C_DGREEN)
+    sb.Position = UDim2.new(0, 12, 0, 34)
+    sb.Size = UDim2.new(1, -24, 0, 16)
+    local sep = Instance.new("Frame")
+    sep.BackgroundColor3 = C_LINE
+    sep.BorderSizePixel = 0
+    sep.Position = UDim2.new(0, 12, 0, 56)
+    sep.Size = UDim2.new(1, -24, 0, 1)
+    sep.Parent = win
+    local console = Instance.new("Frame")
+    console.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+    console.BorderSizePixel = 0
+    console.Position = UDim2.new(0, 12, 0, 64)
+    console.Size = UDim2.new(1, -24, 0, 180)
+    console.Parent = win
+    stroke(console, Color3.fromRGB(50, 50, 50))
+    local cpad = Instance.new("UIPadding")
+    cpad.PaddingLeft = UDim.new(0, 8)
+    cpad.PaddingRight = UDim.new(0, 8)
+    cpad.PaddingTop = UDim.new(0, 6)
+    cpad.PaddingBottom = UDim.new(0, 6)
+    cpad.Parent = console
+    local clay = Instance.new("UIListLayout")
+    clay.FillDirection = Enum.FillDirection.Vertical
+    clay.Padding = UDim.new(0, 2)
+    clay.SortOrder = Enum.SortOrder.LayoutOrder
+    clay.Parent = console
+    local barBG = Instance.new("Frame")
+    barBG.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    barBG.BorderSizePixel = 0
+    barBG.Position = UDim2.new(0, 12, 0, 252)
+    barBG.Size = UDim2.new(1, -24, 0, 14)
+    barBG.Visible = false
+    barBG.Parent = win
+    stroke(barBG, Color3.fromRGB(90, 90, 90))
+    local chunk = Instance.new("Frame")
+    chunk.BackgroundColor3 = C_GREEN
+    chunk.BorderSizePixel = 0
+    chunk.Position = UDim2.fromScale(0, 0)
+    chunk.Size = UDim2.fromScale(0.25, 1)
+    chunk.Parent = barBG
+    local function mkB(text, xs, ws, red)
+        local b = Instance.new("TextButton")
+        b.BackgroundColor3 = red and Color3.fromRGB(150, 30, 30) or Color3.fromRGB(24, 24, 24)
+        b.BorderSizePixel = 0
+        b.Font = F
+        b.Position = UDim2.new(xs, 0, 1, -40)
+        b.Size = UDim2.new(ws, -5, 0, 30)
+        b.Text = text
+        b.TextColor3 = red and Color3.new(1, 1, 1) or C_TXT
+        b.TextSize = 14
+        b.AutoButtonColor = false
+        b.Visible = false
+        b.Parent = win
+        stroke(b, red and Color3.fromRGB(200, 60, 60) or nil)
+        local base = b.BackgroundColor3
+        b.MouseEnter:Connect(function()
+            b.BackgroundColor3 = red and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(34, 34, 34)
+        end)
+        b.MouseLeave:Connect(function() b.BackgroundColor3 = base end)
+        return b
+    end
+    local closeB = mkB("Close", 0.022, 0.466, true)
+    closeB.MouseButton1Click:Connect(function() sgui:Destroy() end)
+    local L = { _marquee = false, _n = 0, _failed = false }
+    function L.log(text, color)
+        L._n = L._n + 1
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Font = F
+        l.Size = UDim2.new(1, 0, 0, 16)
+        l.Text = tostring(text)
+        l.TextColor3 = color or C_DIMTXT
+        l.TextSize = 13
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextTruncate = Enum.TextTruncate.AtEnd
+        l.LayoutOrder = L._n
+        l.Parent = console
+    end
+    function L.startMarquee()
+        barBG.Visible = true
+        if L._marquee then return end
+        L._marquee = true
+        task.spawn(function()
+            local pos, dir = 0, 1
+            while L._marquee and barBG.Parent do
+                pos = pos + dir * 0.05
+                if pos >= 0.75 then dir = -1 end
+                if pos <= 0 then dir = 1 end
+                chunk.Position = UDim2.fromScale(pos, 0)
+                task.wait(0.06)
+            end
+        end)
+    end
+    function L.stopMarquee(ok)
+        L._marquee = false
+        barBG.Visible = true
+        chunk.Position = UDim2.fromScale(0, 0)
+        chunk.Size = UDim2.fromScale(1, 1)
+        chunk.BackgroundColor3 = ok and C_GREEN or C_RED
+    end
+    function L.fail(msg)
+        L._failed = true
+        warn("[iwk-loader] " .. tostring(msg))
+        L.stopMarquee(false)
+        L.log("> " .. tostring(msg), C_RED)
+        closeB.Visible = true
+    end
+    function L.ok(msg)
+        L.stopMarquee(true)
+        L.log("> " .. tostring(msg), C_GREEN)
+    end
+    function L.showClose() closeB.Visible = true end
+    function L.close()
+        if sgui.Parent then sgui:Destroy() end
+    end
+    function L.didFail() return L._failed end
+    return L
 end
 
 function GUI:Destroy()

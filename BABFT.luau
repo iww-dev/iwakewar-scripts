@@ -15,7 +15,7 @@ local function loadGUI()
   if ok and src and #src > 1000 then
     return (loadstring(src))()
   end
-  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/iwakewar-scripts/iwakewar-gui.luau"
+  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
   return (loadstring(game:HttpGet(url, true)))()
 end
 local GUI = loadGUI()
@@ -27,6 +27,7 @@ local Window = GUI:CreateWindow({
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
+GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/iwakewar-scripts/BABFT.luau"
 local Tabs = {
   Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
   Main = Window:AddTab({ Title = "Main", Icon = "" }),

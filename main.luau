@@ -166,7 +166,7 @@ local function buildSplash()
     win.BackgroundColor3 = C_PANEL
     win.BorderSizePixel = 0
     win.Position = UDim2.fromScale(0.5, 0.5)
-    win.Size = UDim2.fromOffset(460, 380)
+    win.Size = UDim2.fromOffset(480, 400)
     win.Parent = sgui
 
     local winBorder = Instance.new("UIStroke")
@@ -174,6 +174,19 @@ local function buildSplash()
     winBorder.Thickness = 1
     winBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     winBorder.Parent = win
+
+    -- внутренняя рамка: двойной контур как в гуихе
+    local inner = Instance.new("Frame")
+    inner.BackgroundTransparency = 1
+    inner.AnchorPoint = Vector2.new(0.5, 0.5)
+    inner.Position = UDim2.fromScale(0.5, 0.5)
+    inner.Size = UDim2.new(1, -8, 1, -8)
+    inner.Parent = win
+    local innerStroke = Instance.new("UIStroke")
+    innerStroke.Color = Color3.fromRGB(38, 38, 38)
+    innerStroke.Thickness = 1
+    innerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    innerStroke.Parent = inner
 
     -- верхняя кислотная полоса 2px, без скруглений
     local accent = Instance.new("Frame")
@@ -186,20 +199,31 @@ local function buildSplash()
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
     title.Font = F
-    title.Position = UDim2.new(0, 10, 0, 10)
-    title.Size = UDim2.new(1, -20, 0, 22)
+    title.Position = UDim2.new(0, 12, 0, 10)
+    title.Size = UDim2.new(1, -150, 0, 24)
     title.Text = "> iwakewar-scripts_"
     title.TextColor3 = C_TXT
     title.TextSize = 18
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = win
 
+    local tty = Instance.new("TextLabel")
+    tty.BackgroundTransparency = 1
+    tty.Font = F
+    tty.Position = UDim2.new(1, -140, 0, 12)
+    tty.Size = UDim2.new(0, 128, 0, 16)
+    tty.Text = "root@alpine:~#"
+    tty.TextColor3 = Color3.fromRGB(90, 90, 90)
+    tty.TextSize = 11
+    tty.TextXAlignment = Enum.TextXAlignment.Right
+    tty.Parent = win
+
     local sub = Instance.new("TextLabel")
     sub.BackgroundTransparency = 1
     sub.Font = F
-    sub.Position = UDim2.new(0, 10, 0, 32)
-    sub.Size = UDim2.new(1, -20, 0, 16)
-    sub.Text = "[loader v1] :: terminal"
+    sub.Position = UDim2.new(0, 12, 0, 34)
+    sub.Size = UDim2.new(1, -24, 0, 16)
+    sub.Text = "[loader v2] :: terminal"
     sub.TextColor3 = C_DGREEN
     sub.TextSize = 13
     sub.TextXAlignment = Enum.TextXAlignment.Left
@@ -208,16 +232,16 @@ local function buildSplash()
     local sep = Instance.new("Frame")
     sep.BackgroundColor3 = C_LINE
     sep.BorderSizePixel = 0
-    sep.Position = UDim2.new(0, 10, 0, 54)
-    sep.Size = UDim2.new(1, -20, 0, 1)
+    sep.Position = UDim2.new(0, 12, 0, 56)
+    sep.Size = UDim2.new(1, -24, 0, 1)
     sep.Parent = win
 
     -- окошко командной строки
     local console = Instance.new("Frame")
     console.BackgroundColor3 = C_CONSOLE
     console.BorderSizePixel = 0
-    console.Position = UDim2.new(0, 10, 0, 62)
-    console.Size = UDim2.new(1, -20, 0, 168)
+    console.Position = UDim2.new(0, 12, 0, 64)
+    console.Size = UDim2.new(1, -24, 0, 180)
     console.Parent = win
     local conStroke = Instance.new("UIStroke")
     conStroke.Color = Color3.fromRGB(50, 50, 50)
@@ -240,8 +264,8 @@ local function buildSplash()
     local barBG = Instance.new("Frame")
     barBG.BackgroundColor3 = C_BARBG
     barBG.BorderSizePixel = 0
-    barBG.Position = UDim2.new(0, 10, 0, 238)
-    barBG.Size = UDim2.new(1, -20, 0, 14)
+    barBG.Position = UDim2.new(0, 12, 0, 252)
+    barBG.Size = UDim2.new(1, -24, 0, 14)
     barBG.Visible = false
     barBG.Parent = win
     local barStroke = Instance.new("UIStroke")
@@ -263,8 +287,8 @@ local function buildSplash()
     errBox.BackgroundColor3 = Color3.fromRGB(24, 10, 10)
     errBox.BorderSizePixel = 0
     errBox.Font = F
-    errBox.Position = UDim2.new(0, 10, 0, 260)
-    errBox.Size = UDim2.new(1, -20, 0, 62)
+    errBox.Position = UDim2.new(0, 12, 0, 274)
+    errBox.Size = UDim2.new(1, -24, 0, 62)
     errBox.Text = ""
     errBox.TextColor3 = C_RED
     errBox.TextSize = 12
@@ -285,6 +309,7 @@ local function buildSplash()
     errPad.PaddingBottom = UDim.new(0, 4)
     errPad.Parent = errBox
 
+    local closeBtnRef: { btn: TextButton? } = { btn = nil }
     local function mkBtn(text: string, xScale: number, wScale: number): TextButton
         local b = Instance.new("TextButton")
         b.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
@@ -303,15 +328,26 @@ local function buildSplash()
         st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         st.Parent = b
         b.MouseEnter:Connect(function()
-            b.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+            if closeBtnRef.btn ~= nil and b == closeBtnRef.btn then
+                b.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+            else
+                b.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+            end
         end)
         b.MouseLeave:Connect(function()
-            b.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+            if closeBtnRef.btn ~= nil and b == closeBtnRef.btn then
+                b.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+            else
+                b.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+            end
         end)
         return b
     end
 
-    local closeBtn = mkBtn("[ close ]", 0.022, 0.466)
+    local closeBtn = mkBtn("Close", 0.022, 0.466)
+    closeBtnRef.btn = closeBtn
+    closeBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Visible = false
     closeBtn.MouseButton1Click:Connect(function()
         sgui:Destroy()
