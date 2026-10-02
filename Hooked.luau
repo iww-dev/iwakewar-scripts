@@ -18,21 +18,21 @@ local RS = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local function loadFluent()
+local function loadGUI()
     local src
-    local ok, read = pcall(readfile, "_fluent.lua")
-    if ok and #read > 1000 then
+    local ok, read = pcall(readfile, "_iwakewar_gui.lua")
+    if ok and read and #read > 1000 then
         src = read
     else
-        src = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua", true)
+        src = game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau", true)
     end
-    if #src < 1000 then
-        error("Fluent source could not be loaded")
+    if not src or #src < 1000 then
+        error("iwakewar-gui source could not be loaded")
     end
     return (loadstring(src))()
 end
 
-local Fluent = loadFluent()
+local GUI = loadGUI()
 -- reload-safe: kill previous Fluent window so toggles don't double
 pcall(function()
     local g0 = getgenv and getgenv() or {}
@@ -41,84 +41,28 @@ pcall(function()
     end
 end)
 if getgenv then
-    getgenv().__hookedFluent = Fluent
+    getgenv().__hookedFluent = GUI
 end
 local genv0 = getgenv and getgenv() or {}
 genv0.__hookedGen = (genv0.__hookedGen or 0) + 1
 local myGen = genv0.__hookedGen
 
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
-local Window = Fluent:CreateWindow({
+local Window = GUI:CreateWindow({
     Title = "Hooked",
     SubTitle = "by iwakewar team",
     TabWidth = 150,
-    Size = isPhone and UDim2.fromOffset(452, 344) or UDim2.fromOffset(566, 430),
-    Acrylic = false,
-    Theme = "Darker",
-    MinimizeKey = Enum.KeyCode.RightControl,
+    Size = UDim2.fromOffset(640, 460),
+    ToggleKey = Enum.KeyCode.RightAlt,
 })
+GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Hooked.luau"
 local Tabs = {
     Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
     Main = Window:AddTab({ Title = "Controls", Icon = "gamepad-2" }),
 }
-local Options = Fluent.Options
+local Options = GUI.Options
 Window:SelectTab(1)
--- Real/gethui fix: Fluent sometimes leaves GUI unparented here -> force to PlayerGui
-pcall(function()
-    local gui = Fluent.GUI
-    if gui and not gui.Parent then
-        gui.Parent = plr:WaitForChild("PlayerGui")
-    end
-end)
-if isPhone then
-do
-  pcall(function() game:GetService("CoreGui").HOOKEDtoggle:Destroy() end)
-  local sg = Instance.new("ScreenGui")
-  sg.Name = "HOOKEDtoggle" sg.ResetOnSpawn = false
-  pcall(function() sg.Parent = game:GetService("CoreGui") end)
-  if sg.Parent == nil then sg.Parent = plr.PlayerGui end
-  local b = Instance.new("TextButton")
-  b.Size = UDim2.fromOffset(40, 40)
-  b.Position = UDim2.new(0.5, -20, 0.5, -260)
-  b.Text = "H" b.TextSize = 18
-  b.BackgroundColor3 = Color3.fromRGB(30, 32, 40) b.TextColor3 = Color3.new(1, 1, 1)
-  b.Parent = sg
-  local cc = Instance.new("UICorner") cc.CornerRadius = UDim.new(0, 8) cc.Parent = b
-  local glow = Instance.new("UIStroke")
-  glow.Thickness = 2 glow.Color = Color3.fromRGB(0, 220, 255) glow.Transparency = 0.2
-  glow.Parent = b
-  task.spawn(function()
-    local ts = game:GetService("TweenService")
-    while b.Parent do
-      pcall(function()
-        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.7 }):Play()
-        task.wait(0.85)
-        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.2 }):Play()
-        task.wait(0.85)
-      end)
-    end
-  end)
-  local drag, ds, sp, moved = false, nil, nil, 0
-  b.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-      drag, ds, sp, moved = true, i.Position, b.Position, 0
-    end
-  end)
-  b.InputEnded:Connect(function() drag = false end)
-  UIS.InputChanged:Connect(function(i)
-    if drag and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
-      local d = i.Position - ds moved = d.Magnitude
-      b.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
-    end
-  end)
-  b.Activated:Connect(function()
-    if moved < 12 then
-      local g = Fluent.GUI
-      if g then g.Enabled = not g.Enabled end
-    end
-  end)
-end
-end
+-- mobile floating toggle is built into iwakewar-gui, nothing to do here
 
 -- engine state
 local hitboxMult = 3.0
@@ -558,7 +502,7 @@ local Live = Tabs.Main:AddParagraph({
 
 local function notify(title: string, content: string, duration: number)
     if noNotifications then return end
-    Fluent:Notify({
+    GUI:Notify({
         Title = title,
         Content = content,
         Duration = duration,
@@ -743,7 +687,7 @@ Tabs.Info:AddButton({
 task.spawn(function()
     while genv0.__hookedGen == myGen do
         task.wait(1)
-        if Fluent.Unloaded then break end
+        if GUI.Unloaded then break end
         local stxt = autokill and "AUTOKILL" or (rage and "ON" or "OFF")
         local tname = currentTarget and currentTarget.name or "-"
         local tdist = currentTarget and math.floor(currentTarget.dist) or 0
@@ -775,7 +719,7 @@ end)
 task.spawn(function()
     while genv0.__hookedGen == myGen do
         task.wait(0.15)
-        if Fluent.Unloaded then break end
+        if GUI.Unloaded then break end
         if rage then
             pcall(aimDirection)
         else
@@ -795,7 +739,7 @@ end)
 -- тянется к нам вниз и падает/дохает. бонус: якорем нас самих не утащить.
 RunService.Heartbeat:Connect(function()
     if genv0.__hookedGen ~= myGen then return end
-    if Fluent.Unloaded then return end
+    if GUI.Unloaded then return end
     if not autokill then return end
     local hrp = myHRP()
     if not hrp then return end
@@ -814,7 +758,7 @@ end)
 -- speed fallback (Heartbeat runs after WalkSpeed Stepped overwrite)
 RunService.Heartbeat:Connect(function()
     if genv0.__hookedGen ~= myGen then return end
-    if Fluent.Unloaded then return end
+    if GUI.Unloaded then return end
     if not speedOn then return end
     local h = myHum()
     if h and h.Health > 0 then
@@ -828,7 +772,7 @@ end)
 -- inf jump
 UIS.JumpRequest:Connect(function()
     if genv0.__hookedGen ~= myGen then return end
-    if Fluent.Unloaded then return end
+    if GUI.Unloaded then return end
     if not infJump then return end
     local h = myHum()
     if h and h.Health > 0 then

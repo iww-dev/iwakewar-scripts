@@ -21,37 +21,32 @@ local genv0 = getG()
 if genv0.__hwFluent and type(genv0.__hwFluent.Destroy) == "function" then
   pcall(function() genv0.__hwFluent:Destroy() end)
 end
--- Fluent loader with fallback: BFNFR-style.
--- Было: loadstring(readfile("_fluent.lua"))() -- падает на Delta,
--- если файла нет в workspace (readfile кидает ошибку и весь скрипт умирает молча).
-local function loadFluent()
+-- GUI loader: iwakewar-gui with local + github fallback.
+local function loadGUI()
   local src = nil
-  local okR, resR = pcall(function() return readfile("_fluent.lua") end)
+  local okR, resR = pcall(function() return readfile("_iwakewar_gui.lua") end)
   if okR and typeof(resR) == "string" and #resR > 1000 then
     src = resR
   else
     local okH, resH = pcall(function()
-      return game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua", true)
+      return game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau", true)
     end)
     if okH and typeof(resH) == "string" and #resH > 1000 then
       src = resH
-      -- закэшировать для следующего запуска (не критично если не выйдет)
-      pcall(writefile, "_fluent.lua", src)
     end
   end
   if not src or #src < 1000 then
-    error("Fluent source could not be loaded (no _fluent.lua and HttpGet fallback failed). "
-      .. "Put _fluent.lua next to the script or allow HttpGet.")
+    error("iwakewar-gui source could not be loaded.")
   end
   if typeof(loadstring) ~= "function" then
     error("loadstring() missing on this executor")
   end
   local fn, err = loadstring(src)
-  if not fn then error("Fluent compile error: " .. tostring(err)) end
+  if not fn then error("GUI compile error: " .. tostring(err)) end
   return fn()
 end
-local Fluent = loadFluent()
-genv0.__hwFluent = Fluent
+local GUI = loadGUI()
+genv0.__hwFluent = GUI
 -- Drawing есть не везде (на части мобильных сборок Delta обрезан) -- ESP без него не работает
 local hasDrawing = typeof(Drawing) == "table" and typeof(Drawing.new) == "function"
 if not hasDrawing then
@@ -59,20 +54,19 @@ if not hasDrawing then
   task.spawn(function()
     task.wait(1)
     pcall(function()
-      Fluent:Notify({ Title = "Hidden Within", Content = "Drawing API missing: ESP disabled", Duration = 5 })
+      GUI:Notify({ Title = "Hidden Within", Content = "Drawing API missing: ESP disabled", Duration = 5 })
     end)
     warn("[HW] Drawing API missing on this executor, ESP disabled")
   end)
 end
-local Window = Fluent:CreateWindow({
+local Window = GUI:CreateWindow({
   Title = "Hidden Within",
   SubTitle = "by iwakewar team",
   TabWidth = 140,
-  Size = isPhone and UDim2.fromOffset(452, 344) or UDim2.fromOffset(566, 430),
-  Acrylic = false,
-  Theme = "Dark",
-  MinimizeKey = Enum.KeyCode.RightControl,
+  Size = UDim2.fromOffset(640, 460),
+  ToggleKey = Enum.KeyCode.RightAlt,
 })
+GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/HW.luau"
 local Tabs = {
   Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
   Main = Window:AddTab({ Title = "Main", Icon = "" }),
@@ -95,58 +89,10 @@ Tabs.Info:AddButton({
   Description = "Copy invite link to clipboard",
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
-    Fluent:Notify({ Title = "Hidden Within", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
+    GUI:Notify({ Title = "Hidden Within", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
   end,
 })
-if isPhone then
-do
-  pcall(function() game:GetService("CoreGui").HWtoggle:Destroy() end)
-  local sg = Instance.new("ScreenGui")
-  sg.Name = "HWtoggle" sg.ResetOnSpawn = false
-  pcall(function() sg.Parent = game:GetService("CoreGui") end)
-  if sg.Parent == nil then sg.Parent = LP.PlayerGui end
-  local b = Instance.new("TextButton")
-  b.Size = UDim2.fromOffset(40, 40)
-  b.Position = UDim2.new(0.5, -20, 0.5, -260)
-  b.Text = "B" b.TextSize = 18
-  b.BackgroundColor3 = Color3.fromRGB(30, 32, 40) b.TextColor3 = Color3.new(1, 1, 1)
-  b.Parent = sg
-  local cc = Instance.new("UICorner") cc.CornerRadius = UDim.new(0, 8) cc.Parent = b
-  local glow = Instance.new("UIStroke")
-  glow.Thickness = 2 glow.Color = Color3.fromRGB(0, 220, 255) glow.Transparency = 0.2
-  glow.Parent = b
-  task.spawn(function()
-    local ts = game:GetService("TweenService")
-    while b.Parent do
-      pcall(function()
-        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.7 }):Play()
-        task.wait(0.85)
-        ts:Create(glow, TweenInfo.new(0.8), { Transparency = 0.2 }):Play()
-        task.wait(0.85)
-      end)
-    end
-  end)
-  local drag, ds, sp, moved = false, nil, nil, 0
-  b.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-      drag, ds, sp, moved = true, i.Position, b.Position, 0
-    end
-  end)
-  b.InputEnded:Connect(function() drag = false end)
-  UIS.InputChanged:Connect(function(i)
-    if drag and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
-      local d = i.Position - ds moved = d.Magnitude
-      b.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
-    end
-  end)
-  b.Activated:Connect(function()
-    if moved < 12 then
-      local g = Fluent.GUI
-      if g then g.Enabled = not g.Enabled end
-    end
-  end)
-end
-end
+-- mobile GUI toggle is built into iwakewar-gui (old HWtoggle phone button removed)
 
 local espTog = Tabs.Main:AddToggle("EspTog", { Title = "ESP", Description = "Roles, HP, distance", Default = true })
 espTog:OnChanged(function() cfg.esp = espTog.Value end)
