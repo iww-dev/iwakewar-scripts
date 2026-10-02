@@ -4,7 +4,7 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
-local cfg = { farm = false, speed = 60 }
+local cfg = { farm = false, speed = 406 }
 
 local genv0 = getgenv()
 if genv0.__babftFluent and type(genv0.__babftFluent.Destroy) == "function" then
@@ -60,7 +60,7 @@ farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
 local ratePara = Tabs.Main:AddParagraph({ Title = "Gold per 15 minutes", Content = "-" })
 local speedSld = Tabs.Main:AddSlider("SpeedSld", {
   Title = "Fly speed", Description = "Studs per second",
-  Default = 60, Min = 20, Max = 406, Rounding = 0,
+  Default = 406, Min = 20, Max = 406, Rounding = 0,
 })
 speedSld:OnChanged(function(v) cfg.speed = v end)
 

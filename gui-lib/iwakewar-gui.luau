@@ -655,6 +655,7 @@ function GUI:CreateWindow(wcfg)
         local pad = Instance.new("UIPadding")
         pad.PaddingTop = UDim.new(0, 2)
         pad.PaddingRight = UDim.new(0, 6)
+        pad.PaddingLeft = UDim.new(0, 2)
         pad.Parent = page
         local tab = { name = name, btn = b, page = page, _win = self, bar = bar2 }
         b.MouseButton1Click:Connect(function()
