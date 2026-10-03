@@ -39,6 +39,7 @@ GUI.Lang = "ru"
 GUI.Strings = {
     ru = {
         close = "Закрыть",
+        minimize = "Свернуть",
         terminal = "Терминал",
         inputHint = "введи help",
         helpHead = "команды: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet",
@@ -47,6 +48,7 @@ GUI.Strings = {
     },
     en = {
         close = "Close",
+        minimize = "Minimize",
         terminal = "Terminal",
         inputHint = "type help",
         helpHead = "commands: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet",
@@ -592,17 +594,126 @@ function GUI:CreateWindow(wcfg)
     x.MouseEnter:Connect(function() x.BackgroundColor3 = Color3.fromRGB(180, 40, 40) end)
     x.MouseLeave:Connect(function() x.BackgroundColor3 = Color3.fromRGB(150, 30, 30) end)
 
-    -- drag
+    -- minimize: рядом с закрыть, работает везде (пк + телефон)
+    local minBtn = Instance.new("TextButton")
+    minBtn.BackgroundColor3 = C_PANEL2
+    minBtn.BorderSizePixel = 0
+    minBtn.Font = F
+    minBtn.Text = GUI:T("minimize")
+    minBtn.TextSize = 13
+    minBtn.TextColor3 = C_TXT
+    minBtn.AutoButtonColor = false
+    minBtn.Size = UDim2.fromOffset(fitWidth(0, GUI:T("minimize"), 13, 24), 28)
+    minBtn.Position = UDim2.new(1, -(x.Size.X.Offset + minBtn.Size.X.Offset + 16), 0, 14)
+    minBtn.Parent = bar
+    stroke(minBtn)
+    minBtn.MouseEnter:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(34, 34, 34) end)
+    minBtn.MouseLeave:Connect(function() minBtn.BackgroundColor3 = C_PANEL2 end)
+
+    -- плавающая кнопка: появляется при сворачивании, таскается, тап = развернуть по центру
+    local floatBtn = Instance.new("TextButton")
+    floatBtn.Name = "iwkFloat"
+    floatBtn.Visible = false
+    floatBtn.Size = UDim2.fromOffset(52, 52)
+    floatBtn.Position = UDim2.new(0, 24, 0.5, -26)
+    floatBtn.Text = string.sub(title, 1, 1)
+    floatBtn.Font = F
+    floatBtn.TextSize = 22
+    floatBtn.BackgroundColor3 = C_PANEL2
+    floatBtn.TextColor3 = C_TXT
+    floatBtn.AutoButtonColor = false
+    floatBtn.Parent = sgui
+    do
+        local cc = Instance.new("UICorner")
+        cc.CornerRadius = UDim.new(0, 12)
+        cc.Parent = floatBtn
+    end
+    stroke(floatBtn, C_ACCENT)
+    local function setMinimized(on)
+        if GUI.Unloaded then return end
+        if on then
+            if not win.Visible then return end
+            win.Visible = false
+            floatBtn.Visible = true
+        else
+            if win.Visible then floatBtn.Visible = false return end
+            win.Visible = true
+            win.Position = UDim2.fromScale(0.5, 0.5)
+            floatBtn.Visible = false
+        end
+    end
+    minBtn.MouseButton1Click:Connect(function() setMinimized(true) end)
+    minBtn.Activated:Connect(function() setMinimized(true) end)
+    do
+        local drag, ds, sp, moved = false, nil, nil, 0
+        floatBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                drag, ds, sp, moved = true, i.Position, floatBtn.Position, 0
+            end
+        end)
+        floatBtn.InputEnded:Connect(function() drag = false end)
+        UIS.InputChanged:Connect(function(i)
+            if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local d = i.Position - ds
+                moved = d.Magnitude
+                floatBtn.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+            end
+        end)
+        floatBtn.Activated:Connect(function()
+            if moved < 14 then setMinimized(false) end
+        end)
+    end
+
+    -- ресайз: всегда, за нижний-правый угол пальцем/мышкой
+    do
+        local grip = Instance.new("TextButton")
+        grip.Name = "iwkResize"
+        grip.AnchorPoint = Vector2.new(1, 1)
+        grip.Position = UDim2.new(1, -2, 1, -2)
+        grip.Size = UDim2.fromOffset(26, 26)
+        grip.BackgroundTransparency = 1
+        grip.Font = F
+        grip.Text = "◢"
+        grip.TextSize = 16
+        grip.TextColor3 = C_DIMTXT
+        grip.TextXAlignment = Enum.TextXAlignment.Right
+        grip.TextYAlignment = Enum.TextYAlignment.Bottom
+        grip.AutoButtonColor = false
+        grip.ZIndex = 50
+        grip.Parent = win
+        local resizing, startPos, startSize = false, nil, nil
+        grip.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                resizing, startPos, startSize = true, i.Position, win.Size
+            end
+        end)
+        grip.InputEnded:Connect(function() resizing = false end)
+        UIS.InputChanged:Connect(function(i)
+            if resizing and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local sc = 1
+                pcall(function() sc = uiscale.Scale end)
+                if type(sc) ~= "number" or sc <= 0 then sc = 1 end
+                local d = (i.Position - startPos) / sc
+                local nw = math.clamp(startSize.X.Offset + d.X, 340, 1200)
+                local nh = math.clamp(startSize.Y.Offset + d.Y, 280, 800)
+                win.Size = UDim2.fromOffset(nw, nh)
+            end
+        end)
+        grip.MouseEnter:Connect(function() grip.TextColor3 = C_ACCENT end)
+        grip.MouseLeave:Connect(function() grip.TextColor3 = C_DIMTXT end)
+    end
+
+    -- drag (мышь + тач, чтобы на андроиде тоже таскалось за шапку)
     do
         local drag, ds, sp = false, nil, nil
         bar.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
                 drag, ds, sp = true, i.Position, win.Position
             end
         end)
         bar.InputEnded:Connect(function() drag = false end)
         UIS.InputChanged:Connect(function(i)
-            if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
+            if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
                 local d = i.Position - ds
                 win.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
             end
@@ -1185,61 +1296,9 @@ function GUI:CreateWindow(wcfg)
         GUI:Destroy()
     end)
 
-    -- mobile floating toggle
-    if isPhone then
-        pcall(function() game:GetService("CoreGui").iwkToggle:Destroy() end)
-        local sg2 = Instance.new("ScreenGui")
-        sg2.Name = "iwkToggle"
-        sg2.ResetOnSpawn = false
-        pcall(function() sg2.Parent = game:GetService("CoreGui") end)
-        if sg2.Parent == nil then sg2.Parent = LP:WaitForChild("PlayerGui") end
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.fromOffset(48, 48)
-        b.Position = UDim2.new(0.5, -24, 0.5, -260)
-        b.Text = string.sub(title, 1, 1)
-        b.Font = F
-        b.TextSize = 20
-        b.BackgroundColor3 = C_PANEL2
-        b.TextColor3 = C_TXT
-        b.Parent = sg2
-        local cc = Instance.new("UICorner")
-        cc.CornerRadius = UDim.new(0, 10)
-        cc.Parent = b
-        local glow = Instance.new("UIStroke")
-        glow.Thickness = 3
-        glow.Color = C_GREEN
-        glow.Transparency = 0.4
-        glow.Parent = b
-        task.spawn(function()
-            while b.Parent do
-                pcall(function()
-                    TW:Create(glow, TweenInfo.new(0.8), { Transparency = 0.75 }):Play()
-                    task.wait(0.85)
-                    TW:Create(glow, TweenInfo.new(0.8), { Transparency = 0.25 }):Play()
-                    task.wait(0.85)
-                end)
-            end
-        end)
-        local drag, ds, sp, moved = false, nil, nil, 0
-        b.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-                drag, ds, sp, moved = true, i.Position, b.Position, 0
-            end
-        end)
-        b.InputEnded:Connect(function() drag = false end)
-        UIS.InputChanged:Connect(function(i)
-            if drag and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
-                local d = i.Position - ds
-                moved = d.Magnitude
-                b.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
-            end
-        end)
-        b.Activated:Connect(function()
-            if moved < 12 and sgui.Parent then
-                sgui.Enabled = not sgui.Enabled
-            end
-        end)
-    end
+    -- старый отдельный тоггл для телефонов удалён: теперь универсальная
+    -- плавающая кнопка iwkFloat (см. выше) работает везде через "Свернуть".
+    -- отдельный ScreenGui iwkToggle больше не создаём, чтобы не было дублей.
 
     -- terminal tab: всегда последняя, максимально снизу
     task.defer(function()

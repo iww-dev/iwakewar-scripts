@@ -21,6 +21,7 @@ local function loadGUI()
 end
 local GUI = loadGUI()
 genv0.__doorsFluent = GUI
+pcall(function() GUI:SetLang("ru") end)
 local Window = GUI:CreateWindow({
   Title = "DOORS Helper",
   SubTitle = "by iwakewar team",
@@ -32,8 +33,21 @@ GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/
 local Tabs = {
   Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
   Main = Window:AddTab({ Title = "Main", Icon = "" }),
+  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
 }
 Window:SelectTab(1)
+
+-- Settings: пока только язык, по умолчанию русский
+Tabs.Settings:AddDropdown("Lang", {
+  Title = "Language / Язык",
+  Values = { "Русский", "English" },
+  Default = "Русский",
+  Callback = function(v)
+    pcall(function()
+      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+    end)
+  end,
+})
 Tabs.Info:AddParagraph({
   Title = "DOORS Helper",
   Content = "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)",

@@ -48,6 +48,7 @@ genv0.__hookedGen = (genv0.__hookedGen or 0) + 1
 local myGen = genv0.__hookedGen
 
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
+pcall(function() GUI:SetLang("ru") end)
 local Window = GUI:CreateWindow({
     Title = "Hooked",
     SubTitle = "by iwakewar team",
@@ -59,9 +60,22 @@ GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/
 local Tabs = {
     Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
     Main = Window:AddTab({ Title = "Controls", Icon = "gamepad-2" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
 }
 local Options = GUI.Options
 Window:SelectTab(1)
+
+-- Settings: пока только язык, по умолчанию русский
+Tabs.Settings:AddDropdown("Lang", {
+  Title = "Language / Язык",
+  Values = { "Русский", "English" },
+  Default = "Русский",
+  Callback = function(v)
+    pcall(function()
+      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+    end)
+  end,
+})
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
 
 -- engine state

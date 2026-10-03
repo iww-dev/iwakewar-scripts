@@ -22,6 +22,7 @@ local function loadGUI()
 end
 local GUI = loadGUI()
 genv0.__mm2Fluent = GUI
+pcall(function() GUI:SetLang("ru") end)
 local Window = GUI:CreateWindow({
   Title = "MM2 Helper",
   SubTitle = "by iwakewar team",
@@ -33,8 +34,21 @@ GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/
 local Tabs = {
   Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
   Main = Window:AddTab({ Title = "Main", Icon = "" }),
+  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
 }
 Window:SelectTab(1)
+
+-- Settings: пока только язык, по умолчанию русский
+Tabs.Settings:AddDropdown("Lang", {
+  Title = "Language / Язык",
+  Values = { "Русский", "English" },
+  Default = "Русский",
+  Callback = function(v)
+    pcall(function()
+      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+    end)
+  end,
+})
 Tabs.Info:AddParagraph({
   Title = "MM2 Helper",
     Content = "Helper for Murder Mystery 2\nby iwakewar team\n\n- Coin farm (fly + noclip, nearest first)\n- Auto Get Gun (TP to dropped gun + back)\n- Auto Fling Sheriff (pendulum-ram off map at round start)\n- Murderer / Sheriff ESP\n- Ctrl+Click teleport, noclip",

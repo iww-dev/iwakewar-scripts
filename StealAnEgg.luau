@@ -66,6 +66,7 @@ local function loadGUI()
 end
 local GUI = loadGUI()
 genv0.__farmFluent = GUI
+pcall(function() GUI:SetLang("ru") end)
 local Window = GUI:CreateWindow({
   Title = "StealAnEgg Farm",
   SubTitle = "by iwakewar team",
@@ -77,8 +78,21 @@ GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/
 local Tabs = {
   Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
   Main = Window:AddTab({ Title = "Farm", Icon = "" }),
+  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
 }
 Window:SelectTab(2)
+
+-- Settings: пока только язык, по умолчанию русский
+Tabs.Settings:AddDropdown("Lang", {
+  Title = "Language / Язык",
+  Values = { "Русский", "English" },
+  Default = "Русский",
+  Callback = function(v)
+    pcall(function()
+      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+    end)
+  end,
+})
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
 Tabs.Info:AddParagraph({
   Title = "StealAnEgg Farm",
