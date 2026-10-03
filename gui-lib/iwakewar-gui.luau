@@ -15,19 +15,52 @@ local LP = Players.LocalPlayer
 local isPhoneGlobal = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local SC = isPhoneGlobal and 0.7 or 1
 
+-- iwakewar-gui v3 | violet night, top tabs, groupboxes. no fluent needed.
+-- Было: ancient flat style. Стало: тёмный фиолет, табы сверху,
+-- секции-групбоксы, компактные строки. API тот же.
 local F = Enum.Font.Code
-local C_PANEL = Color3.fromRGB(16, 16, 16)
-local C_PANEL2 = Color3.fromRGB(24, 24, 24)
-local C_LINE = Color3.fromRGB(70, 70, 70)
-local C_TXT = Color3.fromRGB(220, 220, 220)
-local C_DIMTXT = Color3.fromRGB(140, 140, 140)
+local C_BG = Color3.fromRGB(12, 11, 24)
+local C_PANEL = Color3.fromRGB(18, 16, 32)
+local C_PANEL2 = Color3.fromRGB(26, 24, 48)
+local C_LINE = Color3.fromRGB(62, 56, 108)
+local C_LINE_DARK = Color3.fromRGB(38, 34, 66)
+local C_TXT = Color3.fromRGB(236, 236, 246)
+local C_DIMTXT = Color3.fromRGB(154, 150, 175)
 local C_GREEN = Color3.fromRGB(0, 255, 0)
 local C_DGREEN = Color3.fromRGB(0, 180, 0)
 local C_RED = Color3.fromRGB(255, 60, 60)
+local C_ACCENT = Color3.fromRGB(150, 112, 255)
+local C_ACCENT_DARK = Color3.fromRGB(96, 70, 180)
 
 local GUI = {}
 GUI.Options = {}
 GUI.Unloaded = false
+GUI.Lang = "ru"
+GUI.Strings = {
+    ru = {
+        close = "Закрыть",
+        terminal = "Терминал",
+        inputHint = "введи help",
+        helpHead = "команды: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet",
+        unknown = "не знаю: ",
+        needArg = "нужен аргумент",
+    },
+    en = {
+        close = "Close",
+        terminal = "Terminal",
+        inputHint = "type help",
+        helpHead = "commands: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet",
+        unknown = "unknown: ",
+        needArg = "argument required",
+    },
+}
+function GUI:SetLang(l)
+    if l == "ru" or l == "en" then self.Lang = l end
+end
+function GUI:T(key)
+    local t = self.Strings[self.Lang] or self.Strings.ru
+    return t[key] or key
+end
 
 local function stroke(p, c)
     local s = Instance.new("UIStroke")
@@ -143,11 +176,11 @@ local rockBoxes = {}
 local function rockSet(on, say)
     local c = LP.Character
     if not c then
-        say("no character", false)
+        say("нет персонажа", false)
         return
     end
     if on == rockOn then
-        say(rockOn and "already rock" or "already flesh")
+        say(rockOn and "уже камень" or "уже flesh")
         return
     end
     rockOn = on
@@ -194,7 +227,7 @@ local function rockSet(on, say)
                 table.insert(rockBoxes, b)
             end
         end
-        say("rock mode ON (slate + wide collide)", true)
+        say("камень ON (сланец + широкая коллизия)", true)
     else
         for inst, s in pairs(rockSaved) do
             pcall(function()
@@ -214,12 +247,12 @@ local function rockSet(on, say)
             pcall(function() b:Destroy() end)
         end
         rockBoxes = {}
-        say("rock mode OFF", true)
+        say("камень OFF", true)
     end
 end
 
 local function buildTerminal(Window)
-    local tab = Window:AddTab({ Title = "Terminal" })
+    local tab = Window:AddTab({ Title = GUI:T("terminal") })
     local page = tab.page
     local out = Instance.new("ScrollingFrame")
     out.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
@@ -248,7 +281,7 @@ local function buildTerminal(Window)
     inp.BorderSizePixel = 0
     inp.Font = F
     inp.Text = ""
-    inp.PlaceholderText = "help"
+    inp.PlaceholderText = GUI:T("inputHint")
     inp.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
     inp.TextColor3 = C_GREEN
     inp.TextSize = 13
@@ -289,8 +322,8 @@ local function buildTerminal(Window)
     local cmds = {}
 
     cmds.help = function()
-        ok2("commands: executor | game | playtime | iw-barock | ce | loadstring | reload | timer | ping | raknet")
-        say("aliases: i-want-to-be-a-rock, closentire, close-entire, re, st, tr")
+        ok2(GUI:T("helpHead"))
+        say("альясы: i-want-to-be-a-rock, closentire, close-entire, re, st, tr")
     end
 
     cmds.executor = function()
@@ -303,19 +336,19 @@ local function buildTerminal(Window)
                 if typeof(getexecutorname) == "function" then name = getexecutorname() end
             end)
         end
-        ok2("executor: " .. tostring(name or "unknown"))
+        ok2("экзекьютор: " .. tostring(name or "unknown"))
     end
 
     cmds.game = function()
         say("placeId: " .. tostring(game.PlaceId))
         say("universeId: " .. tostring(game.GameId))
         say("jobId: " .. tostring(game.JobId))
-        say("players: " .. #Players:GetPlayers())
+        say("игроков: " .. #Players:GetPlayers())
         local nm = nil
         pcall(function()
             nm = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
         end)
-        say("place: " .. tostring(nm or game.Name))
+        say("плейс: " .. tostring(nm or game.Name))
     end
 
     cmds.playtime = function()
@@ -324,8 +357,8 @@ local function buildTerminal(Window)
         if type(srv) ~= "number" then
             pcall(function() srv = workspace.DistributedGameTime end)
         end
-        say("server playtime: " .. (type(srv) == "number" and fmtDur(srv) or "unknown"))
-        say("script uptime: " .. fmtDur(os.clock() - GUI._t0))
+        say("время сервера: " .. (type(srv) == "number" and fmtDur(srv) or "unknown"))
+        say("аптайм скрипта: " .. fmtDur(os.clock() - GUI._t0))
     end
 
     cmds["i-want-to-be-a-rock"] = function(arg)
@@ -357,28 +390,28 @@ local function buildTerminal(Window)
     cmds["ce"] = fullClose
 
     cmds.loadstring = function(arg)
-        if not arg or arg == "" then err("usage: loadstring <url|code>") return end
+        if not arg or arg == "" then err("юз: loadstring <url|code>") return end
         task.spawn(function()
             local src = arg
             if arg:match("^https?://") then
                 local ok, res = pcall(function() return game:HttpGet(arg) end)
-                if not ok then err("http failed") return end
+                if not ok then err("http не сработал") return end
                 src = res
             end
             local fn, e = loadstring(src)
-            if not fn then err("compile: " .. tostring(e)) return end
+            if not fn then err("компиляция: " .. tostring(e)) return end
             local ok, r = pcall(fn)
-            ok2(ok and ("done -> " .. tostring(r)) or ("runtime: " .. tostring(r)))
+            ok2(ok and ("готово -> " .. tostring(r)) or ("рантайм: " .. tostring(r)))
         end)
     end
 
     local function doReload()
         local url = GUI._selfUrl
         if not url or url == "" then
-            err("reload: script did not set GUI._selfUrl")
+            err("релоад: скрипт не задал GUI._selfUrl")
             return
         end
-        say("reloading from " .. url .. " ...")
+        say("релоад с " .. url .. " ...")
         task.spawn(function()
             GUI.Unloaded = true
             for _, fn in ipairs(GUI._onClose) do pcall(fn) end
@@ -399,11 +432,11 @@ local function buildTerminal(Window)
 
     cmds["set-timer"] = function(arg)
         local s = tonumber(arg)
-        if not s or s <= 0 then err("usage: timer <seconds>") return end
-        ok2("timer set: " .. s .. "s")
+        if not s or s <= 0 then err("юз: timer <секунды>") return end
+        ok2("таймер: " .. s .. "s")
         task.delay(s, function()
             for i = 1, 5 do
-                GUI:Notify({ Title = "TIMER", Content = "TIMER ENDED", Duration = 3 })
+                GUI:Notify({ Title = "TIMER", Content = "ТАЙМЕР КОНЧИЛСЯ", Duration = 3 })
                 task.wait(0.45)
             end
         end)
@@ -412,10 +445,10 @@ local function buildTerminal(Window)
     cmds.st = cmds["set-timer"]
 
     cmds.ping = function(arg)
-        if not arg or arg == "" then err("usage: ping <host>") return end
+        if not arg or arg == "" then err("юз: ping <host>") return end
         local a = string.lower(arg)
         if a == "roblox" or a:match("^roblox%.com") then
-            say("measuring place ping 10s ...")
+            say("меряю пинг 10с ...")
             task.spawn(function()
                 local sum, n = 0, 0
                 for i = 1, 10 do
@@ -425,8 +458,8 @@ local function buildTerminal(Window)
                     if ok and typeof(v) == "number" then sum, n = sum + v, n + 1 end
                     task.wait(1)
                 end
-                if n > 0 then ok2(string.format("roblox ping: %.0f ms (avg %d samples)", sum / n, n))
-                else err("ping unknown") end
+                if n > 0 then ok2(string.format("роблокс пинг: %.0f мс (%d замеров)", sum / n, n))
+                else err("пинг unknown") end
             end)
             return
         end
@@ -435,7 +468,7 @@ local function buildTerminal(Window)
             local t0 = os.clock()
             local ok = pcall(function() game:HttpGet(url) end)
             if ok then ok2(string.format("%s: %.0f ms (http)", arg, (os.clock() - t0) * 1000))
-            else err("ping unknown") end
+            else err("пинг unknown") end
         end)
     end
 
@@ -447,9 +480,9 @@ local function buildTerminal(Window)
                     if typeof(v) == "function" then table.insert(fns, k) end
                 end
             end)
-            ok2("RakNet: available (" .. #fns .. " funcs: " .. table.concat(fns, ", "):sub(1, 120) .. ")")
+            ok2("RakNet: есть (" .. #fns .. " функций: " .. table.concat(fns, ", "):sub(1, 120) .. ")")
         else
-            err("RakNet: not available here")
+            err("RakNet тут нет")
         end
     end
     cmds["test-raknet"] = cmds.testraknet
@@ -464,9 +497,9 @@ local function buildTerminal(Window)
         local fn = cmds[cmd]
         if fn then
             local ok, e = pcall(fn, arg)
-            if not ok then err("error: " .. tostring(e)) end
+            if not ok then err("ошибка: " .. tostring(e)) end
         else
-            err("unknown: " .. cmd .. " (help)")
+            err(GUI:T("unknown") .. cmd)
         end
     end
 
@@ -524,7 +557,7 @@ function GUI:CreateWindow(wcfg)
     uiscale.Parent = win
 
     local accent = Instance.new("Frame")
-    accent.BackgroundColor3 = C_GREEN
+    accent.BackgroundColor3 = C_ACCENT
     accent.BorderSizePixel = 0
     accent.Size = UDim2.new(1, 0, 0, 2)
     accent.Parent = win
@@ -548,11 +581,11 @@ function GUI:CreateWindow(wcfg)
     x.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
     x.BorderSizePixel = 0
     x.Font = F
-    x.Text = "Close"
+    x.Text = GUI:T("close")
     x.TextSize = 13
     x.TextColor3 = Color3.new(1, 1, 1)
     x.AutoButtonColor = false
-    x.Size = UDim2.fromOffset(fitWidth(0, "Close", 13, 24), 28)
+    x.Size = UDim2.fromOffset(fitWidth(0, GUI:T("close"), 13, 24), 28)
     x.Position = UDim2.new(1, -(x.Size.X.Offset + 10), 0, 14)
     x.Parent = bar
     stroke(x, Color3.fromRGB(200, 60, 60))
@@ -576,30 +609,23 @@ function GUI:CreateWindow(wcfg)
         end)
     end
 
-    -- sidebar
-    local side = Instance.new("Frame")
-    side.BackgroundColor3 = C_PANEL2
-    side.BorderSizePixel = 0
-    side.Position = UDim2.new(0, 10, 0, 66)
-    side.Size = UDim2.new(0, tabW, 1, -76)
-    side.Parent = win
-    stroke(side)
-    local sideLay = Instance.new("UIListLayout")
-    sideLay.FillDirection = Enum.FillDirection.Vertical
-    sideLay.Padding = UDim.new(0, 4)
-    sideLay.SortOrder = Enum.SortOrder.LayoutOrder
-    sideLay.Parent = side
-    local sidePad = Instance.new("UIPadding")
-    sidePad.PaddingTop = UDim.new(0, 6)
-    sidePad.PaddingLeft = UDim.new(0, 6)
-    sidePad.PaddingRight = UDim.new(0, 6)
-    sidePad.Parent = side
+    -- верхняя панель табов (как у классики, новее)
+    local tabbar = Instance.new("Frame")
+    tabbar.BackgroundTransparency = 1
+    tabbar.Position = UDim2.new(0, 10, 0, 60)
+    tabbar.Size = UDim2.new(1, -20, 0, 28)
+    tabbar.Parent = win
+    local tabLay = Instance.new("UIListLayout")
+    tabLay.FillDirection = Enum.FillDirection.Horizontal
+    tabLay.Padding = UDim.new(0, 6)
+    tabLay.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLay.Parent = tabbar
 
     -- content holder
     local holder = Instance.new("Frame")
     holder.BackgroundTransparency = 1
-    holder.Position = UDim2.new(0, tabW + 20, 0, 66)
-    holder.Size = UDim2.new(1, -(tabW + 30), 1, -76)
+    holder.Position = UDim2.new(0, 10, 0, 94)
+    holder.Size = UDim2.new(1, -20, 1, -104)
     holder.Parent = win
 
     local Window = { _tabs = {}, _sel = nil, _sgui = sgui, _win = win }
@@ -611,30 +637,27 @@ function GUI:CreateWindow(wcfg)
         self._sel = t
         for _, tb in ipairs(self._tabs) do
             tb.page.Visible = (tb == t)
-            tb.btn.TextColor3 = (tb == t) and C_GREEN or C_TXT
+            tb.btn.TextColor3 = (tb == t) and C_ACCENT or C_TXT
             if tb.bar then tb.bar.Visible = (tb == t) end
         end
     end
 
     function Window:AddTab(tcfg)
         local name = tcfg.Title or ("Tab" .. (#self._tabs + 1))
-        local b = btn(side, name, C_TXT)
-        b.Size = UDim2.new(1, 0, 0, 30)
-        b.AutomaticSize = Enum.AutomaticSize.Y
-        b.TextXAlignment = Enum.TextXAlignment.Left
-        b.TextWrapped = true
+        local b = btn(tabbar, name, C_TXT)
+        b.AutomaticSize = Enum.AutomaticSize.X
+        b.Size = UDim2.new(0, 0, 0, 28)
+        b.TextXAlignment = Enum.TextXAlignment.Center
         local bp = Instance.new("UIPadding")
-        bp.PaddingLeft = UDim.new(0, 18)
-        bp.PaddingRight = UDim.new(0, 6)
-        bp.PaddingTop = UDim.new(0, 6)
-        bp.PaddingBottom = UDim.new(0, 6)
+        bp.PaddingLeft = UDim.new(0, 16)
+        bp.PaddingRight = UDim.new(0, 16)
         bp.Parent = b
-        -- зелёная полоска активного таба: вылезает на 3px левее кнопки
+        -- акцентная черта активного таба снизу
         local bar2 = Instance.new("Frame")
-        bar2.BackgroundColor3 = C_GREEN
+        bar2.BackgroundColor3 = C_ACCENT
         bar2.BorderSizePixel = 0
-        bar2.Position = UDim2.new(0, -10, 0, 0)
-        bar2.Size = UDim2.new(0, 3, 1, 0)
+        bar2.Position = UDim2.new(0, 0, 1, -2)
+        bar2.Size = UDim2.new(1, 0, 0, 2)
         bar2.Visible = false
         bar2.Parent = b
         local page = Instance.new("ScrollingFrame")
@@ -664,11 +687,46 @@ function GUI:CreateWindow(wcfg)
             end
         end)
         table.insert(self._tabs, tab)
+        tab._box = nil
 
         function tab:AddSection(text)
-            local s = label(page, "-- " .. tostring(text) .. " --", 12, C_DGREEN, Enum.TextXAlignment.Center)
-            s.Size = UDim2.new(1, 0, 0, 18)
-            s.LayoutOrder = #page:GetChildren() * 10
+            -- групбокс как у классики: рамка + акцентный заголовок, элементы ниже едут внутрь
+            local box = Instance.new("Frame")
+            box.BackgroundColor3 = C_PANEL
+            box.BorderSizePixel = 0
+            box.Size = UDim2.new(1, 0, 0, 40)
+            box.AutomaticSize = Enum.AutomaticSize.Y
+            box.LayoutOrder = #page:GetChildren() * 10
+            box.Parent = page
+            stroke(box)
+            local ht = label(box, tostring(text), 13, C_ACCENT)
+            ht.Position = UDim2.new(0, 10, 0, 4)
+            ht.Size = UDim2.new(1, -20, 0, 18)
+            local sep = Instance.new("Frame")
+            sep.BackgroundColor3 = C_LINE_DARK
+            sep.BorderSizePixel = 0
+            sep.Position = UDim2.new(0, 10, 0, 24)
+            sep.Size = UDim2.new(1, -20, 0, 1)
+            sep.Parent = box
+            local inner = Instance.new("Frame")
+            inner.BackgroundTransparency = 1
+            inner.Position = UDim2.new(0, 10, 0, 30)
+            inner.Size = UDim2.new(1, -20, 0, 10)
+            inner.AutomaticSize = Enum.AutomaticSize.Y
+            inner.Parent = box
+            local il = Instance.new("UIListLayout")
+            il.FillDirection = Enum.FillDirection.Vertical
+            il.Padding = UDim.new(0, 6)
+            il.SortOrder = Enum.SortOrder.LayoutOrder
+            il.Parent = inner
+            local ip = Instance.new("UIPadding")
+            ip.PaddingBottom = UDim.new(0, 8)
+            ip.Parent = inner
+            tab._box = inner
+        end
+
+        local function host()
+            return tab._box or page
         end
 
         function tab:AddParagraph(pcfg)
@@ -677,7 +735,7 @@ function GUI:CreateWindow(wcfg)
             f.BorderSizePixel = 0
             f.Size = UDim2.new(1, 0, 0, 54)
             f.AutomaticSize = Enum.AutomaticSize.Y
-            f.Parent = page
+            f.Parent = host()
             stroke(f)
             local t = label(f, tostring(pcfg.Title or ""), 13, C_TXT)
             t.Position = UDim2.new(0, 10, 0, 4)
@@ -695,7 +753,7 @@ function GUI:CreateWindow(wcfg)
         end
 
         function tab:AddButton(bcfg)
-            local b2 = btn(page, tostring(bcfg.Title or "Button"), C_TXT)
+            local b2 = btn(host(), tostring(bcfg.Title or "Button"), C_TXT)
             b2.Size = UDim2.new(1, 0, 0, 30)
             b2.TextXAlignment = Enum.TextXAlignment.Left
             if bcfg.Description then
@@ -708,31 +766,39 @@ function GUI:CreateWindow(wcfg)
         end
 
         function tab:AddToggle(id, tcfg)
-            local f = Instance.new("Frame")
-            f.BackgroundColor3 = C_PANEL2
+            -- строка-чекбокс как у классики: квадрат слева + текст, без отдельной панели
+            local f = Instance.new("TextButton")
+            f.BackgroundTransparency = 1
             f.BorderSizePixel = 0
-            f.Size = UDim2.new(1, 0, 0, 30)
-            f.Parent = page
-            stroke(f)
+            f.Size = UDim2.new(1, 0, 0, 24)
+            f.Text = ""
+            f.AutoButtonColor = false
+            f.Parent = host()
+            local box = Instance.new("Frame")
+            box.BackgroundColor3 = C_PANEL2
+            box.BorderSizePixel = 0
+            box.Position = UDim2.new(0, 2, 0.5, -8)
+            box.Size = UDim2.fromOffset(16, 16)
+            box.Parent = f
+            stroke(box)
+            local mark = Instance.new("Frame")
+            mark.BackgroundColor3 = C_ACCENT
+            mark.BorderSizePixel = 0
+            mark.AnchorPoint = Vector2.new(0.5, 0.5)
+            mark.Position = UDim2.fromScale(0.5, 0.5)
+            mark.Size = UDim2.new(1, -6, 1, -6)
+            mark.Visible = false
+            mark.Parent = box
             local t = label(f, tostring(tcfg.Title or id), 13, C_TXT)
-            t.Position = UDim2.new(0, 10, 0, 0)
-            t.Size = UDim2.new(1, -90, 1, 0)
+            t.Position = UDim2.new(0, 26, 0, 0)
+            t.Size = UDim2.new(1, -30, 1, 0)
             t.TextYAlignment = Enum.TextYAlignment.Center
-            if tcfg.Description then
-                t.Text = tostring(tcfg.Title) .. "  [" .. tostring(tcfg.Description):sub(1, 40) .. "]"
-            end
-            local s = btn(f, "[ off ]", C_DIMTXT)
-            s.AutomaticSize = Enum.AutomaticSize.X
-            s.Size = UDim2.new(0, 0, 0, 22)
-            s.AnchorPoint = Vector2.new(1, 0.5)
-            s.Position = UDim2.new(1, -10, 0.5, 0)
-            s.TextSize = 12
+            t.TextTruncate = Enum.TextTruncate.AtEnd
             local tog = { Value = false, _cbs = {} }
             local function paint()
-                local txt = tog.Value and "[ on ]" or "[ off ]"
-                s.Text = txt
-                s.Size = UDim2.new(0, measureX(txt, 12) + 20, 0, 22)
-                s.TextColor3 = tog.Value and C_GREEN or C_DIMTXT
+                mark.Visible = tog.Value
+                box.BackgroundColor3 = tog.Value and C_ACCENT_DARK or C_PANEL2
+                t.TextColor3 = tog.Value and C_TXT or C_DIMTXT
             end
             function tog:SetValue(v)
                 v = (v == true)
@@ -740,11 +806,12 @@ function GUI:CreateWindow(wcfg)
                 tog.Value = v
                 paint()
                 for _, fn in ipairs(tog._cbs) do task.spawn(fn, v) end
+                for _, fn in ipairs(tog._clicks or {}) do task.spawn(fn, v) end
                 if tcfg.Callback then task.spawn(tcfg.Callback, v) end
             end
             function tog:OnChanged(fn) table.insert(tog._cbs, fn) end
-            function tog:OnClick(fn) table.insert(tog._cbs, fn) end
-            s.MouseButton1Click:Connect(function() tog:SetValue(not tog.Value) end)
+            function tog:OnClick(fn) table.insert(tog._clicks or {}, fn) end
+            f.MouseButton1Click:Connect(function() tog:SetValue(not tog.Value) end)
             tog.Value = (tcfg.Default == true)
             paint()
             GUI.Options[id] = tog
@@ -762,35 +829,44 @@ function GUI:CreateWindow(wcfg)
                 return v
             end
             local f = Instance.new("Frame")
-            f.BackgroundColor3 = C_PANEL2
+            f.BackgroundTransparency = 1
             f.BorderSizePixel = 0
-            f.Size = UDim2.new(1, 0, 0, 52)
-            f.Parent = page
-            stroke(f)
+            f.Size = UDim2.new(1, 0, 0, 40)
+            f.Parent = host()
             local t = label(f, tostring(scfg.Title or id), 13, C_TXT)
-            t.Position = UDim2.new(0, 10, 0, 2)
-            t.Size = UDim2.new(1, -90, 0, 18)
-            local val = label(f, "", 12, C_GREEN, Enum.TextXAlignment.Right)
-            val.Position = UDim2.new(1, -78, 0, 2)
-            val.Size = UDim2.new(0, 70, 0, 18)
+            t.Position = UDim2.new(0, 2, 0, 0)
+            t.Size = UDim2.new(1, -70, 0, 18)
+            local val = label(f, "", 12, C_ACCENT, Enum.TextXAlignment.Right)
+            val.Position = UDim2.new(1, -62, 0, 0)
+            val.Size = UDim2.new(0, 60, 0, 18)
             local rail = Instance.new("TextButton")
-            rail.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+            rail.BackgroundColor3 = C_PANEL2
             rail.BorderSizePixel = 0
-            rail.Position = UDim2.new(0, 8, 0, 26)
-            rail.Size = UDim2.new(1, -20, 0, 14)
+            rail.Position = UDim2.new(0, 2, 0, 22)
+            rail.Size = UDim2.new(1, -4, 0, 12)
             rail.Text = ""
             rail.AutoButtonColor = false
             rail.Parent = f
-            stroke(rail, Color3.fromRGB(50, 50, 50))
+            stroke(rail, C_LINE_DARK)
             local fill = Instance.new("Frame")
-            fill.BackgroundColor3 = C_GREEN
+            fill.BackgroundColor3 = C_ACCENT
             fill.BorderSizePixel = 0
             fill.Size = UDim2.new(0, 0, 1, 0)
             fill.Parent = rail
+            -- белый knob как у классики
+            local knob = Instance.new("Frame")
+            knob.BackgroundColor3 = Color3.new(1, 1, 1)
+            knob.BorderSizePixel = 0
+            knob.AnchorPoint = Vector2.new(0.5, 0.5)
+            knob.Position = UDim2.new(0, 0, 0.5, 0)
+            knob.Size = UDim2.fromOffset(10, 16)
+            knob.Parent = rail
             local sld = { Value = fmt(tonumber(scfg.Default) or min), _cbs = {} }
             local function paint()
                 local r = (sld.Value - min) / math.max(0.0001, (max - min))
-                fill.Size = UDim2.new(math.clamp(r, 0, 1), 0, 1, 0)
+                r = math.clamp(r, 0, 1)
+                fill.Size = UDim2.new(r, 0, 1, 0)
+                knob.Position = UDim2.new(r, 0, 0.5, 0)
                 val.Text = tostring(sld.Value)
             end
             function sld:SetValue(v)
@@ -834,15 +910,15 @@ function GUI:CreateWindow(wcfg)
             if typeof(cur) == "number" then cur = vals[cur] end
             if cur == nil then cur = vals[1] end
             local f = Instance.new("Frame")
-            f.BackgroundColor3 = C_PANEL2
+            f.BackgroundTransparency = 1
             f.BorderSizePixel = 0
-            f.Size = UDim2.new(1, 0, 0, 30)
-            f.Parent = page
-            stroke(f)
+            f.Size = UDim2.new(1, 0, 0, 26)
+            f.Parent = host()
             local t = label(f, tostring(dcfg.Title or id), 13, C_TXT)
-            t.Position = UDim2.new(0, 10, 0, 0)
-            t.Size = UDim2.new(0.55, -8, 1, 0)
-            local b2 = btn(f, tostring(cur) .. " [+]", C_GREEN)
+            t.Position = UDim2.new(0, 2, 0, 0)
+            t.Size = UDim2.new(0.5, 0, 1, 0)
+            t.TextYAlignment = Enum.TextYAlignment.Center
+            local b2 = btn(f, tostring(cur) .. " [+]", C_ACCENT)
             b2.Size = UDim2.new(0.45, -16, 0, 22)
             b2.Position = UDim2.new(0.55, 8, 0.5, -11)
             b2.TextSize = 12
@@ -879,7 +955,7 @@ function GUI:CreateWindow(wcfg)
                 pd.PaddingRight = UDim.new(0, 4)
                 pd.Parent = pop
                 for _, v in ipairs(vals) do
-                    local ob = btn(pop, tostring(v), (v == dd.Value) and C_GREEN or C_TXT)
+                    local ob = btn(pop, tostring(v), (v == dd.Value) and C_ACCENT or C_TXT)
                     ob.Size = UDim2.new(1, 0, 0, 22)
                     ob.TextSize = 12
                     ob.ZIndex = 101
@@ -892,16 +968,16 @@ function GUI:CreateWindow(wcfg)
 
         function tab:AddColorpicker(id, ccfg)
             local cur = ccfg.Default
-            if typeof(cur) ~= "Color3" then cur = Color3.fromRGB(0, 255, 0) end
+            if typeof(cur) ~= "Color3" then cur = C_ACCENT end
             local f = Instance.new("Frame")
-            f.BackgroundColor3 = C_PANEL2
+            f.BackgroundTransparency = 1
             f.BorderSizePixel = 0
-            f.Size = UDim2.new(1, 0, 0, 30)
-            f.Parent = page
-            stroke(f)
+            f.Size = UDim2.new(1, 0, 0, 26)
+            f.Parent = host()
             local t = label(f, tostring(ccfg.Title or id), 13, C_TXT)
-            t.Position = UDim2.new(0, 10, 0, 0)
-            t.Size = UDim2.new(1, -80, 1, 0)
+            t.Position = UDim2.new(0, 2, 0, 0)
+            t.Size = UDim2.new(1, -70, 1, 0)
+            t.TextYAlignment = Enum.TextYAlignment.Center
             local sw = Instance.new("TextButton")
             sw.BackgroundColor3 = cur
             sw.BorderSizePixel = 0
@@ -1005,16 +1081,15 @@ function GUI:CreateWindow(wcfg)
             local key = tostring(kcfg.Default or "H")
             local mode = kcfg.Mode or "Toggle"
             local f = Instance.new("Frame")
-            f.BackgroundColor3 = C_PANEL2
+            f.BackgroundTransparency = 1
             f.BorderSizePixel = 0
-            f.Size = UDim2.new(1, 0, 0, 30)
-            f.Parent = page
-            stroke(f)
+            f.Size = UDim2.new(1, 0, 0, 26)
+            f.Parent = host()
             local t = label(f, tostring(kcfg.Title or id), 13, C_TXT)
-            t.Position = UDim2.new(0, 10, 0, 0)
-            t.Size = UDim2.new(1, -100, 1, 0)
+            t.Position = UDim2.new(0, 2, 0, 0)
+            t.Size = UDim2.new(1, -80, 1, 0)
             t.TextYAlignment = Enum.TextYAlignment.Center
-            local kb = btn(f, "[ " .. key .. " ]", C_GREEN)
+            local kb = btn(f, "[ " .. key .. " ]", C_ACCENT)
             kb.AutomaticSize = Enum.AutomaticSize.X
             kb.Size = UDim2.new(0, 0, 0, 22)
             kb.AnchorPoint = Vector2.new(1, 0.5)
@@ -1224,7 +1299,7 @@ function GUI:Loader(ocfg)
     inner.Parent = win
     stroke(inner, Color3.fromRGB(38, 38, 38))
     local accent = Instance.new("Frame")
-    accent.BackgroundColor3 = C_GREEN
+    accent.BackgroundColor3 = C_ACCENT
     accent.BorderSizePixel = 0
     accent.Size = UDim2.new(1, 0, 0, 2)
     accent.Parent = win
