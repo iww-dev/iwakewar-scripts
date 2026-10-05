@@ -57,7 +57,41 @@ GUI.Strings = {
     },
 }
 function GUI:SetLang(l)
-    if l == "ru" or l == "en" then self.Lang = l end
+    if l ~= "ru" and l ~= "en" then return end
+    self.Lang = l
+    pcall(function()
+        -- обновить ядро (иначе Закрыть/Терминал навсегда на одном языке)
+        if self._core then
+            if self._core.closeBtn then
+                self._core.closeBtn.Text = self:T("close")
+            end
+            if self._core.minBtn then
+                self._core.minBtn.Text = self:T("minimize")
+            end
+            -- пересчитать ширину/позиции (RU слова длиннее EN)
+            if self._core.closeBtn and self._core.minBtn then
+                local cw = fitWidth(0, self:T("close"), 13, 24)
+                local mw = fitWidth(0, self:T("minimize"), 13, 24)
+                self._core.closeBtn.Size = UDim2.fromOffset(cw, 28)
+                self._core.closeBtn.Position = UDim2.new(1, -(cw + 10), 0, 14)
+                self._core.minBtn.Size = UDim2.fromOffset(mw, 28)
+                self._core.minBtn.Position = UDim2.new(1, -(cw + mw + 16), 0, 14)
+            end
+        end
+        if self._termTab and self._termTab.btn then
+            self._termTab.btn.Text = self:T("terminal")
+        end
+    end)
+    if self._langCbs then
+        for _, fn in ipairs(self._langCbs) do
+            pcall(fn, l)
+        end
+    end
+end
+function GUI:OnLangChanged(fn)
+    self._langCbs = self._langCbs or {}
+    table.insert(self._langCbs, fn)
+    return fn
 end
 function GUI:T(key)
     local t = self.Strings[self.Lang] or self.Strings.ru
@@ -609,6 +643,7 @@ function GUI:CreateWindow(wcfg)
     stroke(minBtn)
     minBtn.MouseEnter:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(34, 34, 34) end)
     minBtn.MouseLeave:Connect(function() minBtn.BackgroundColor3 = C_PANEL2 end)
+    GUI._core = { closeBtn = x, minBtn = minBtn, bar = bar }
 
     -- плавающая кнопка: появляется при сворачивании, таскается, тап = развернуть по центру
     local floatBtn = Instance.new("TextButton")
@@ -665,16 +700,18 @@ function GUI:CreateWindow(wcfg)
     end
 
     -- ресайз: всегда, за нижний-правый угол пальцем/мышкой
+    -- держим флаг пока кнопка/палец зажаты (глобальный InputEnded, а не только grip),
+    -- иначе при быстром движении grip уходит из-под курсора и ресайз стопорится
     do
         local grip = Instance.new("TextButton")
         grip.Name = "iwkResize"
         grip.AnchorPoint = Vector2.new(1, 1)
         grip.Position = UDim2.new(1, -2, 1, -2)
-        grip.Size = UDim2.fromOffset(26, 26)
+        grip.Size = UDim2.fromOffset(30, 30)
         grip.BackgroundTransparency = 1
         grip.Font = F
         grip.Text = "◢"
-        grip.TextSize = 16
+        grip.TextSize = 18
         grip.TextColor3 = C_DIMTXT
         grip.TextXAlignment = Enum.TextXAlignment.Right
         grip.TextYAlignment = Enum.TextYAlignment.Bottom
@@ -687,9 +724,16 @@ function GUI:CreateWindow(wcfg)
                 resizing, startPos, startSize = true, i.Position, win.Size
             end
         end)
-        grip.InputEnded:Connect(function() resizing = false end)
+        -- стоп только когда реально отпустили кнопку/палец (глобально),
+        -- а не когда курсор слез с маленького грипа
+        UIS.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                resizing = false
+            end
+        end)
         UIS.InputChanged:Connect(function(i)
             if resizing and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                if not startPos or not startSize then return end
                 local sc = 1
                 pcall(function() sc = uiscale.Scale end)
                 if type(sc) ~= "number" or sc <= 0 then sc = 1 end
@@ -922,6 +966,8 @@ function GUI:CreateWindow(wcfg)
             end
             function tog:OnChanged(fn) table.insert(tog._cbs, fn) end
             function tog:OnClick(fn) table.insert(tog._clicks or {}, fn) end
+            function tog:SetTitle(v) t.Text = tostring(v) end
+            function tog:SetDesc(_) end
             f.MouseButton1Click:Connect(function() tog:SetValue(not tog.Value) end)
             tog.Value = (tcfg.Default == true)
             paint()
@@ -988,6 +1034,8 @@ function GUI:CreateWindow(wcfg)
                 if scfg.Callback then task.spawn(scfg.Callback, v) end
             end
             function sld:OnChanged(fn) table.insert(sld._cbs, fn) end
+            function sld:SetTitle(v) t.Text = tostring(v) end
+            function sld:SetDesc(_) end
             do
                 local drag = false
                 local function apply(x)
@@ -1046,6 +1094,7 @@ function GUI:CreateWindow(wcfg)
                 if dcfg.Callback then task.spawn(dcfg.Callback, v) end
             end
             function dd:OnChanged(fn) table.insert(dd._cbs, fn) end
+            function dd:SetTitle(v) t.Text = tostring(v) end
             b2.MouseButton1Click:Connect(function()
                 if pop then close() return end
                 b2.Text = tostring(dd.Value) .. " [-]"
@@ -1304,7 +1353,14 @@ function GUI:CreateWindow(wcfg)
     task.defer(function()
         if GUI.Unloaded then return end
         pcall(function()
-            buildTerminal(Window)
+            local termTab = buildTerminal(Window)
+            GUI._termTab = termTab
+            -- если язык уже EN, а таб создался с RU дефолтом — сразу обновить
+            pcall(function()
+                if termTab and termTab.btn then
+                    termTab.btn.Text = GUI:T("terminal")
+                end
+            end)
             if #Window._tabs > 0 and (Window._sel == nil or Window._sel == Window._tabs[1]) then
                 -- не трогаем выбор скрипта; терминал просто в конце списка
             end

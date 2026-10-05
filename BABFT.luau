@@ -10,17 +10,26 @@ local genv0 = getgenv()
 if genv0.__babftFluent and type(genv0.__babftFluent.Destroy) == "function" then
   pcall(function() genv0.__babftFluent:Destroy() end)
 end
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-  local ok, src = pcall(readfile, "_iwakewar_gui.lua")
-  if ok and src and #src > 1000 then
-    return (loadstring(src))()
-  end
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  return (loadstring(game:HttpGet(url, true)))()
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 local GUI = loadGUI()
 genv0.__babftFluent = GUI
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
   Title = "BABFT Farm",
   SubTitle = "by iwakewar team",
@@ -30,26 +39,30 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/iwakewar-scripts/BABFT.luau"
 local Tabs = {
-  Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-  Main = Window:AddTab({ Title = "Main", Icon = "" }),
-  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+  Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+  Main = Window:AddTab({ Title = LT("Главная", "Main"), Icon = "" }),
+  Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 Window:SelectTab(1)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
-Tabs.Info:AddParagraph({
+local infoPara = Tabs.Info:AddParagraph({
   Title = "BABFT Farm",
-  Content = "Autofarm for Build A Boat For Treasure\nby iwakewar team\n\n- Launch via button handler (no boat needed)\n- Smooth flight base -> center -> stages -> chest\n- 0.3s at chest, reset, next circle",
+  Content = LT(
+    "Автофарм для Build A Boat For Treasure\nby iwakewar team\n\n- Запуск через кнопку (лодка не нужна)\n- Плавный полёт база -> центр -> этапы -> сундук\n- 0.3с у сундука, ресет, следующий круг",
+    "Autofarm for Build A Boat For Treasure\nby iwakewar team\n\n- Launch via button handler (no boat needed)\n- Smooth flight base -> center -> stages -> chest\n- 0.3s at chest, reset, next circle"),
 })
 local function copyToClipboard(text)
   local g = getgenv and getgenv() or {}
@@ -59,24 +72,42 @@ local function copyToClipboard(text)
   end
   return false
 end
-Tabs.Info:AddButton({
-  Title = "Our Discord Server",
-  Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+  Title = LT("Наш Discord сервер", "Our Discord Server"),
+  Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
-    GUI:Notify({ Title = "BABFT Farm", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
+    local en = (getLang() == "en")
+    GUI:Notify({ Title = "BABFT Farm", Content = ok and (en and "Discord link copied" or "Ссылка скопирована") or (en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
 
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = "Farm", Description = "Launch -> fly -> chest -> reset", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм", "Farm"), Description = LT("Запуск -> полёт -> сундук -> ресет", "Launch -> fly -> chest -> reset"), Default = false })
 farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
-local ratePara = Tabs.Main:AddParagraph({ Title = "Gold per 15 minutes", Content = "-" })
+local ratePara = Tabs.Main:AddParagraph({ Title = LT("Голда за 15 минут", "Gold per 15 minutes"), Content = "-" })
 local speedSld = Tabs.Main:AddSlider("SpeedSld", {
-  Title = "Fly speed", Description = "Studs per second",
+  Title = LT("Скорость полёта", "Fly speed"), Description = LT("Стадов в секунду", "Studs per second"),
   Default = 406, Min = 20, Max = 406, Rounding = 0,
 })
 speedSld:OnChanged(function(v) cfg.speed = v end)
+-- живое обновление языка без перезапуска
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Main" or "Главная"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    infoPara:SetTitle("BABFT Farm")
+    infoPara:SetContent(en and
+      "Autofarm for Build A Boat For Treasure\nby iwakewar team\n\n- Launch via button handler (no boat needed)\n- Smooth flight base -> center -> stages -> chest\n- 0.3s at chest, reset, next circle" or
+      "Автофарм для Build A Boat For Treasure\nby iwakewar team\n\n- Запуск через кнопку (лодка не нужна)\n- Плавный полёт база -> центр -> этапы -> сундук\n- 0.3с у сундука, ресет, следующий круг")
+    discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
+    farmTog:SetTitle(en and "Farm" or "Фарм")
+    ratePara:SetTitle(en and "Gold per 15 minutes" or "Голда за 15 минут")
+    speedSld:SetTitle(en and "Fly speed" or "Скорость полёта")
+  end)
+end)
 
 local genv = getgenv()
 genv.__babftGen = (genv.__babftGen or 0) + 1

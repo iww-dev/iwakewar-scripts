@@ -18,18 +18,14 @@ local RS = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-    local src
-    local ok, read = pcall(readfile, "_iwakewar_gui.lua")
-    if ok and read and #read > 1000 then
-        src = read
-    else
-        src = game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau", true)
-    end
-    if not src or #src < 1000 then
-        error("iwakewar-gui source could not be loaded")
-    end
-    return (loadstring(src))()
+  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 
 local GUI = loadGUI()
@@ -48,7 +44,15 @@ genv0.__hookedGen = (genv0.__hookedGen or 0) + 1
 local myGen = genv0.__hookedGen
 
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
     Title = "Hooked",
     SubTitle = "by iwakewar team",
@@ -58,21 +62,24 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Hooked.luau"
 local Tabs = {
-    Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-    Main = Window:AddTab({ Title = "Controls", Icon = "gamepad-2" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+    Main = Window:AddTab({ Title = LT("Управление", "Controls"), Icon = "gamepad-2" }),
+    Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 local Options = GUI.Options
 Window:SelectTab(1)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+-- Settings: пока только язык, по умолчанию русский
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
@@ -503,14 +510,14 @@ end
 applyPatches()
 
 -- GUI elements
-local MainSection = Tabs.Main:AddSection("Main Functions")
+local MainSection = Tabs.Main:AddSection(LT("Основные функции", "Main Functions"))
 
 local Status = Tabs.Main:AddParagraph({
-    Title = "Status",
+    Title = LT("Статус", "Status"),
     Content = "Idle — join a match to test hits.",
 })
 local Live = Tabs.Main:AddParagraph({
-    Title = "Live",
+    Title = LT("Лайв", "Live"),
     Content = "aim: OFF • target: - • speed: 18",
 })
 
@@ -523,7 +530,7 @@ local function notify(title: string, content: string, duration: number)
     })
 end
 
-MainSection:AddToggle("Rage", {
+local rageTog1 = MainSection:AddToggle("Rage", {
     Title = "RAGE",
     Description = "Aim + direction + move hook + team check + no reports + 200/500/240 + CD 1.2",
     Default = true,
@@ -537,8 +544,8 @@ MainSection:AddToggle("Rage", {
     end,
 })
 
-MainSection:AddToggle("InfJump", {
-    Title = "InfJump",
+local infJumpTog = MainSection:AddToggle("InfJump", {
+    Title = LT("Инф-джамп", "InfJump"),
     Description = "Jump in air via JumpRequest",
     Default = false,
     Callback = function(state)
@@ -547,8 +554,8 @@ MainSection:AddToggle("InfJump", {
     end,
 })
 
-MainSection:AddToggle("Speedhack", {
-    Title = "Speedhack",
+local speedTog = MainSection:AddToggle("Speedhack", {
+    Title = LT("Спидхак", "Speedhack"),
     Description = "Buff Speed override + WalkSpeed",
     Default = false,
     Callback = function(state)
@@ -558,7 +565,7 @@ MainSection:AddToggle("Speedhack", {
     end,
 })
 
-MainSection:AddToggle("Rage", {
+local rageTog2 = MainSection:AddToggle("Rage2", {
     Title = "RAGE",
     Description = "Long hook 200 / instant fly / vacuum pull / CD 1.2 + full aim pack",
     Default = true,
@@ -572,8 +579,8 @@ MainSection:AddToggle("Rage", {
     end,
 })
 
-MainSection:AddToggle("NoNotifications", {
-    Title = "Do not send notifications",
+local noNotifTog = MainSection:AddToggle("NoNotifications", {
+    Title = LT("Без уведомлений", "Do not send notifications"),
     Description = "Hide all Fluent notifications",
     Default = false,
     Callback = function(state)
@@ -581,8 +588,8 @@ MainSection:AddToggle("NoNotifications", {
     end,
 })
 
-MainSection:AddToggle("AutoKill", {
-    Title = "AutoKill (void anchor)",
+local autoKillTog = MainSection:AddToggle("AutoKill", {
+    Title = LT("Авто-килл (войд якорь)", "AutoKill (void anchor)"),
     Description = "RAGE + hang anchored under enemy spawn, victims drop to you",
     Default = false,
     Callback = function(state)
@@ -590,8 +597,8 @@ MainSection:AddToggle("AutoKill", {
     end,
 })
 
-MainSection:AddSlider("KillDepth", {
-    Title = "Kill depth",
+local killDepthSld = MainSection:AddSlider("KillDepth", {
+    Title = LT("Глубина килла", "Kill depth"),
     Description = "Y to hang at (void below 0, arena ~190)",
     Default = -5,
     Min = -50,
@@ -605,8 +612,8 @@ MainSection:AddSlider("KillDepth", {
     end,
 })
 
-MainSection:AddDropdown("TargetPart", {
-    Title = "Target part",
+local targetPartDrop = MainSection:AddDropdown("TargetPart", {
+    Title = LT("Часть цели", "Target part"),
     Description = "Which part to aim/teleport to",
     Values = {
         "HumanoidRootPart",
@@ -621,8 +628,8 @@ MainSection:AddDropdown("TargetPart", {
     end,
 })
 
-MainSection:AddDropdown("TargetMode", {
-    Title = "Target mode",
+local targetModeDrop = MainSection:AddDropdown("TargetMode", {
+    Title = LT("Режим цели", "Target mode"),
     Description = "Nearest = ближайший враг, Random = случайный враг",
     Values = {
         "Nearest",
@@ -636,8 +643,8 @@ MainSection:AddDropdown("TargetMode", {
     end,
 })
 
-MainSection:AddSlider("HitboxSize", {
-    Title = "Hitbox multiplier",
+local hitboxSld = MainSection:AddSlider("HitboxSize", {
+    Title = LT("Множитель хитбокса", "Hitbox multiplier"),
     Description = "4 x N studs (server tolerance 40)",
     Default = 3,
     Min = 1,
@@ -649,8 +656,8 @@ MainSection:AddSlider("HitboxSize", {
     end,
 })
 
-MainSection:AddSlider("MaxDist", {
-    Title = "Max target distance",
+local maxDistSld = MainSection:AddSlider("MaxDist", {
+    Title = LT("Макс. дистанция", "Max target distance"),
     Description = "Hook length is 80",
     Default = 80,
     Min = 20,
@@ -661,8 +668,8 @@ MainSection:AddSlider("MaxDist", {
     end,
 })
 
-MainSection:AddSlider("SpeedMult", {
-    Title = "Speed multiplier",
+local speedMultSld = MainSection:AddSlider("SpeedMult", {
+    Title = LT("Множитель скорости", "Speed multiplier"),
     Description = "Base 18; >1.5 risks TeleportReport",
     Default = 1.25,
     Min = 1,
@@ -673,8 +680,8 @@ MainSection:AddSlider("SpeedMult", {
     end,
 })
 
-MainSection:AddKeybind("ToggleKey", {
-    Title = "Toggle keybind",
+local togKey = MainSection:AddKeybind("ToggleKey", {
+    Title = LT("Клавиша-тогл", "Toggle keybind"),
     Description = "Quickly turn RAGE on/off",
     Mode = "Toggle",
     Default = "H",
@@ -683,19 +690,47 @@ MainSection:AddKeybind("ToggleKey", {
     end,
 })
 
-Tabs.Info:AddParagraph({
+local hookedInfo = Tabs.Info:AddParagraph({
     Title = "Hooked",
     Content = "Silent aim + movement for Hooked! [TRAIT]\nby iwakewar team\n\n- RAGE: long hook 200 + instant fly + vacuum pull + CD 1.2\n- Direction + hitbox teleport into enemy\n- Team check везде: игроки по PlayerEntity + боты по BotEntity\n- InfJump, Speedhack x1-2, report blocker\n\nPress H (or your keybind) to toggle.",
 })
 
-Tabs.Info:AddButton({
-    Title = "Our Discord Server",
-    Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+    Title = LT("Наш Discord сервер", "Our Discord Server"),
+    Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
     Callback = function()
         local copied = copyToClipboard("https://discord.gg/GgshjzxxFS")
         notify("Hooked", copied and "Discord link copied" or "No clipboard API on this executor", 2)
     end,
 })
+
+-- живое обновление языка без перезапуска (ядро + табы + секция; динамический Live-статус не трогаем)
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Controls" or "Управление"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    if Status then Status:SetTitle(en and "Status" or "Статус") end
+    if Live then Live:SetTitle(en and "Live" or "Лайв") end
+    if hookedInfo then
+      hookedInfo:SetTitle("Hooked")
+      hookedInfo:SetContent(en and "Silent aim + movement for Hooked! [TRAIT]\nby iwakewar team\n\n- RAGE: long hook 200 + instant fly + vacuum pull + CD 1.2\n- Direction + hitbox teleport into enemy\n- InfJump, Speedhack x1-2, report blocker\n\nPress H (or your keybind) to toggle." or "Сайлент-аим + движение для Hooked! [TRAIT]\nby iwakewar team\n\n- RAGE: длинный хук 200 + мгновенный флай + вакуум + CD 1.2\n- Довод + телепорт хитбокса во врага\n- Инф-джамп, спидхак x1-2, блок репортов\n\nЖми H (или свой бинд) для тогла.")
+    end
+    if discordBtn then discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]" end
+    if infJumpTog then infJumpTog:SetTitle(en and "InfJump" or "Инф-джамп") end
+    if speedTog then speedTog:SetTitle(en and "Speedhack" or "Спидхак") end
+    if noNotifTog then noNotifTog:SetTitle(en and "Do not send notifications" or "Без уведомлений") end
+    if autoKillTog then autoKillTog:SetTitle(en and "AutoKill (void anchor)" or "Авто-килл (войд якорь)") end
+    if killDepthSld then killDepthSld:SetTitle(en and "Kill depth" or "Глубина килла") end
+    if targetPartDrop then targetPartDrop:SetTitle(en and "Target part" or "Часть цели") end
+    if targetModeDrop then targetModeDrop:SetTitle(en and "Target mode" or "Режим цели") end
+    if hitboxSld then hitboxSld:SetTitle(en and "Hitbox multiplier" or "Множитель хитбокса") end
+    if maxDistSld then maxDistSld:SetTitle(en and "Max target distance" or "Макс. дистанция") end
+    if speedMultSld then speedMultSld:SetTitle(en and "Speed multiplier" or "Множитель скорости") end
+    if togKey and togKey.SetTitle then togKey:SetTitle(en and "Toggle keybind" or "Клавиша-тогл") end
+  end)
+end)
 
 -- live status refresh
 task.spawn(function()

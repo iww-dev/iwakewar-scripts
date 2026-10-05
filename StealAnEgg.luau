@@ -56,17 +56,26 @@ local genv0 = getgenv()
 if genv0.__farmFluent and type(genv0.__farmFluent.Destroy) == "function" then
   pcall(function() genv0.__farmFluent:Destroy() end)
 end
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-  local ok, src = pcall(readfile, "_iwakewar_gui.lua")
-  if ok and src and #src > 1000 then
-    return (loadstring(src))()
-  end
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  return (loadstring(game:HttpGet(url, true)))()
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 local GUI = loadGUI()
 genv0.__farmFluent = GUI
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
   Title = "StealAnEgg Farm",
   SubTitle = "by iwakewar team",
@@ -76,27 +85,30 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/StealAnEgg.luau"
 local Tabs = {
-  Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-  Main = Window:AddTab({ Title = "Farm", Icon = "" }),
-  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+  Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+  Main = Window:AddTab({ Title = LT("Ферма", "Farm"), Icon = "" }),
+  Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 Window:SelectTab(2)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+-- Settings: пока только язык, по умолчанию русский
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
-Tabs.Info:AddParagraph({
+local infoPara = Tabs.Info:AddParagraph({
   Title = "StealAnEgg Farm",
-  Content = "Full auto-farmer for Steal An Egg\nby iwakewar team\n\n- Steals eggs on foot (no teleports, anticheat-safe)\n- Instant escape the moment of steal\n- Places eggs on a free PetArea grid slot\n- Auto-hatches ready eggs, wears best pets\n- Upgrades treadmill, buys and equips trails\n- 1 minute on treadmill every 3 circles\n- Adaptive speedhack with server rollback control\n\nEnable Farm and watch the Log tab.",
+  Content = LT("Полный автофарм для Steal An Egg\nby iwakewar team\n\n- Крадёт яйца пешком (без телепортов, безопасно)\n- Мгновенный отрыв в момент кражи\n- Кладёт яйца в свободный слот PetArea\n- Авто-вылупление, надевает лучших петов\n- Улучшает дорожку, покупает следы\n- 1 минута на дорожке каждые 3 круга\n- Адаптивный спидхак с контролем отката\n\nВключи Farm и смотри вкладку Log.", "Full auto-farmer for Steal An Egg\nby iwakewar team\n\n- Steals eggs on foot (no teleports, anticheat-safe)\n- Instant escape the moment of steal\n- Places eggs on a free PetArea grid slot\n- Auto-hatches ready eggs, wears best pets\n- Upgrades treadmill, buys and equips trails\n- 1 minute on treadmill every 3 circles\n- Adaptive speedhack with server rollback control\n\nEnable Farm and watch the Log tab."),
 })
 local function copyToClipboard(text)
   local genv = getgenv and getgenv() or {}
@@ -106,36 +118,39 @@ local function copyToClipboard(text)
   end
   return false
 end
-Tabs.Info:AddButton({
-  Title = "Our Discord Server",
-  Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+  Title = LT("Наш Discord сервер", "Our Discord Server"),
+  Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
-    GUI:Notify({ Title = "StealAnEgg Farm", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
+    local _en = (getLang() == "en")
+    GUI:Notify({ Title = "StealAnEgg Farm", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = "Farm", Description = "Steal -> place -> hatch", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм", "Farm"), Description = "Steal -> place -> hatch", Default = false })
 farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
-local function featTog(id, title, desc, key)
-  local t = Tabs.Main:AddToggle(id, { Title = title, Description = desc, Default = true })
+local eggFeat = {}
+local function featTog(id, ru, en, desc_ru, desc_en, key)
+  local t = Tabs.Main:AddToggle(id, { Title = LT(ru, en), Description = LT(desc_ru, desc_en), Default = true })
+  eggFeat[id] = { obj = t, ru = ru, en = en }
   t:OnChanged(function() cfg[key] = t.Value end)
   return t
 end
-featTog("PlaceEgg", "Place eggs", "Place carried egg on base", "placeEgg")
-featTog("TreadBreak", "Treadmill breaks", "1 minute on treadmill every 3 circles", "treadBreak")
-featTog("UpTread", "Upgrade treadmill", "Buy treadmill upgrades for Money", "upTread")
-featTog("UpTrails", "Buy trails", "Buy and equip best trails", "upTrails")
-featTog("WearBest", "Wear best pets", "Equip strongest pets", "wearBest")
-featTog("AutoHatch", "Auto-hatch", "Hatch eggs when their timer ends", "autoHatch")
+featTog("PlaceEgg", "Класть яйца", "Place eggs", "Класть яйцо на базу", "Place carried egg on base", "placeEgg")
+featTog("TreadBreak", "Перерывы на дорожке", "Treadmill breaks", "1 минута на дорожке каждые 3 круга", "1 minute on treadmill every 3 circles", "treadBreak")
+featTog("UpTread", "Улучшать дорожку", "Upgrade treadmill", "Покупать улучшения дорожки за деньги", "Buy treadmill upgrades for Money", "upTread")
+featTog("UpTrails", "Покупать следы", "Buy trails", "Покупать и надевать лучшие следы", "Buy and equip best trails", "upTrails")
+featTog("WearBest", "Надевать лучших", "Wear best pets", "Надевать сильнейших петов", "Equip strongest pets", "wearBest")
+featTog("AutoHatch", "Авто-вылупление", "Auto-hatch", "Вылуплять яйца по таймеру", "Hatch eggs when their timer ends", "autoHatch")
 local speedDrop = Tabs.Main:AddDropdown("SpeedDrop", {
-  Title = "Speedhack",
+  Title = LT("Спидхак", "Speedhack"),
   Description = "WalkSpeed multiplier",
   Values = { "x1.0", "x1.15", "x1.17", "x1.18" },
   Multi = false,
   Default = 2,
 })
 speedDrop:OnChanged(function(v) cfg.speedMult = tonumber(v:sub(2)) or 1.0 end)
-Tabs.Main:AddButton({ Title = "Step off treadmill", Description = "Treadmill AskDoff",
+local treadBtn = Tabs.Main:AddButton({ Title = LT("Сойти с дорожки", "Step off treadmill"), Description = LT("Дорожка AskDoff", "Treadmill AskDoff"),
   Callback = function() pcall(function() Treadmill.AskDoff:InvokeServer() end) end })
 local function addLog(text, ok)
   print("[FARMv4]", text)
@@ -143,6 +158,23 @@ end
 local function setPlace(t, ok)
   addLog("Place: " .. t, ok)
 end
+-- живое обновление языка без перезапуска
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Farm" or "Ферма"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    infoPara:SetTitle("StealAnEgg Farm")
+    infoPara:SetContent(en and "Full auto-farmer for Steal An Egg\nby iwakewar team\n\n- Steals eggs on foot (no teleports, anticheat-safe)\n- Instant escape the moment of steal\n- Places eggs on a free PetArea grid slot\n- Auto-hatches ready eggs, wears best pets\n- Upgrades treadmill, buys and equips trails\n- 1 minute on treadmill every 3 circles\n- Adaptive speedhack with server rollback control\n\nEnable Farm and watch the Log tab." or "Полный автофарм для Steal An Egg\nby iwakewar team\n\n- Крадёт яйца пешком (без телепортов, безопасно)\n- Мгновенный отрыв в момент кражи\n- Кладёт яйца в свободный слот PetArea\n- Авто-вылупление, надевает лучших петов\n- Улучшает дорожку, покупает следы\n- 1 минута на дорожке каждые 3 круга\n- Адаптивный спидхак с контролем отката\n\nВключи Farm и смотри вкладку Log.")
+    discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
+    farmTog:SetTitle(en and "Farm" or "Фарм")
+    for _, e in pairs(eggFeat) do e.obj:SetTitle(en and e.en or e.ru) end
+    speedDrop:SetTitle(en and "Speedhack" or "Спидхак")
+    if treadBtn then treadBtn.Text = en and "Step off treadmill  [Treadmill AskDoff]" or "Сойти с дорожки  [Дорожка AskDoff]" end
+  end)
+end)
+
 local baseWS = 50
 do
   local ch0 = LP.Character

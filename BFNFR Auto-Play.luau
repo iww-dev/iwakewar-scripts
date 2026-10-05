@@ -23,23 +23,27 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local mf = plr.PlayerGui:WaitForChild("Main"):WaitForChild("MatchFrame")
 local DataF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DataF")
 
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-    local src
-    local ok, read = pcall(readfile, "_iwakewar_gui.lua")
-    if ok and read and #read > 1000 then
-        src = read
-    else
-        src = game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau", true)
-    end
-    if not src or #src < 1000 then
-        error("iwakewar-gui source could not be loaded")
-    end
-    return (loadstring(src))()
+  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 
 local GUI = loadGUI()
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
     Title = "BFNFR Auto-Play",
     SubTitle = "by iwakewar team",
@@ -49,21 +53,24 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau"
 local Tabs = {
-    Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-    Main = Window:AddTab({ Title = "Controls", Icon = "gamepad-2" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+    Main = Window:AddTab({ Title = LT("Управление", "Controls"), Icon = "gamepad-2" }),
+    Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 local Options = GUI.Options
 Window:SelectTab(1)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+-- Settings: пока только язык, по умолчанию русский
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
@@ -275,11 +282,11 @@ end
 local MainSection = Tabs.Main:AddSection("Main Functions")
 
 local Status = Tabs.Main:AddParagraph({
-    Title = "Status",
+    Title = LT("Статус", "Status"),
     Content = "Idle — waiting for a track…",
 })
 local Live = Tabs.Main:AddParagraph({
-    Title = "Live",
+    Title = LT("Лайв", "Live"),
     Content = "state: OFF • side: - • speed: - • hits: 0",
 })
 
@@ -292,8 +299,8 @@ local function notify(title: string, content: string, duration: number)
     })
 end
 
-MainSection:AddToggle("Enabled", {
-    Title = "Auto-Play",
+local enabledTog = MainSection:AddToggle("Enabled", {
+    Title = LT("Авто-игра", "Auto-Play"),
     Description = "Toggle automatic key presses",
     Default = false,
     Callback = function(state)
@@ -305,8 +312,8 @@ MainSection:AddToggle("Enabled", {
     end,
 })
 
-MainSection:AddToggle("AntiAfk", {
-    Title = "Anti-AFK",
+local antiAfkTog = MainSection:AddToggle("AntiAfk", {
+    Title = LT("Анти-АФК", "Anti-AFK"),
     Description = "Jump every 10s while in a track",
     Default = true,
     Callback = function(state)
@@ -314,8 +321,8 @@ MainSection:AddToggle("AntiAfk", {
     end,
 })
 
-MainSection:AddToggle("NoNotifications", {
-    Title = "Do not send notifications",
+local noNotifTog2 = MainSection:AddToggle("NoNotifications", {
+    Title = LT("Без уведомлений", "Do not send notifications"),
     Description = "Hide all Fluent notifications",
     Default = false,
     Callback = function(state)
@@ -323,8 +330,8 @@ MainSection:AddToggle("NoNotifications", {
     end,
 })
 
-MainSection:AddDropdown("PerfectMode", {
-    Title = "Perfect mode",
+local perfectDrop = MainSection:AddDropdown("PerfectMode", {
+    Title = LT("Режим Perfect", "Perfect mode"),
     Description = "Never Perfect, mixed 57/43, or always Perfect",
     Values = {
         "Never Perfect",
@@ -344,8 +351,8 @@ MainSection:AddDropdown("PerfectMode", {
     end,
 })
 
-MainSection:AddKeybind("ToggleKey", {
-    Title = "Toggle keybind",
+local togKey2 = MainSection:AddKeybind("ToggleKey", {
+    Title = LT("Клавиша-тогл", "Toggle keybind"),
     Description = "Quickly turn Auto-Play on/off",
     Mode = "Toggle",
     Default = "H",
@@ -354,19 +361,41 @@ MainSection:AddKeybind("ToggleKey", {
     end,
 })
 
-Tabs.Info:AddParagraph({
+local bfnfrInfo = Tabs.Info:AddParagraph({
     Title = "BFNFR Auto-Play",
-    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle.",
+    Content = LT("Премиум авто-игра для Basically FNF: Remix\nby iwakewar team\n\n- Играет твою линию твоими биндами\n- Полные анимации Hit/Release (реальные нажатия)\n- Холды держит и отпускает корректно\n- Дропдаун Perfect: Never / Mix 57%/43% / Always\n- Самокалибровка тайминга (сохраняется)\n- Встроенный анти-АФК\n\nЖми H (или свой бинд) для тогла.", "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle."),
 })
 
-Tabs.Info:AddButton({
-    Title = "Our Discord Server",
-    Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+    Title = LT("Наш Discord сервер", "Our Discord Server"),
+    Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
     Callback = function()
         local copied = copyToClipboard("https://discord.gg/GgshjzxxFS")
-        notify("BFNFR Auto-Play", copied and "Discord link copied" or "No clipboard API on this executor", 2)
+        do local _en = (getLang() == "en"); notify("BFNFR Auto-Play", copied and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API on this executor" or "Нет буфера на этом экзекьюторе"), 2) end
     end,
 })
+
+-- живое обновление языка без перезапуска
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Controls" or "Управление"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    if Status then Status:SetTitle(en and "Status" or "Статус") end
+    if Live then Live:SetTitle(en and "Live" or "Лайв") end
+    if bfnfrInfo then
+      bfnfrInfo:SetTitle("BFNFR Auto-Play")
+      bfnfrInfo:SetContent(en and "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle." or "Премиум авто-игра для Basically FNF: Remix\nby iwakewar team\n\n- Играет твою линию твоими биндами\n- Полные анимации Hit/Release (реальные нажатия)\n- Холды держит и отпускает корректно\n- Дропдаун Perfect: Never / Mix 57%/43% / Always\n- Самокалибровка тайминга (сохраняется)\n- Встроенный анти-АФК\n\nЖми H (или свой бинд) для тогла.")
+    end
+    if discordBtn then discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]" end
+    if enabledTog then enabledTog:SetTitle(en and "Auto-Play" or "Авто-игра") end
+    if antiAfkTog then antiAfkTog:SetTitle(en and "Anti-AFK" or "Анти-АФК") end
+    if noNotifTog2 then noNotifTog2:SetTitle(en and "Do not send notifications" or "Без уведомлений") end
+    if perfectDrop then perfectDrop:SetTitle(en and "Perfect mode" or "Режим Perfect") end
+  end)
+end)
+
 
 -- live status refresh
 task.spawn(function()

@@ -11,17 +11,26 @@ local genv0 = getgenv()
 if genv0.__doorsFluent and type(genv0.__doorsFluent.Destroy) == "function" then
   pcall(function() genv0.__doorsFluent:Destroy() end)
 end
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-  local ok, src = pcall(readfile, "_iwakewar_gui.lua")
-  if ok and src and #src > 1000 then
-    return (loadstring(src))()
-  end
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  return (loadstring(game:HttpGet(url, true)))()
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 local GUI = loadGUI()
 genv0.__doorsFluent = GUI
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
   Title = "DOORS Helper",
   SubTitle = "by iwakewar team",
@@ -31,24 +40,27 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Doors.luau"
 local Tabs = {
-  Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-  Main = Window:AddTab({ Title = "Main", Icon = "" }),
-  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+  Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+  Main = Window:AddTab({ Title = LT("Главная", "Main"), Icon = "" }),
+  Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 Window:SelectTab(1)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+-- Settings: пока только язык, по умолчанию русский
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
-Tabs.Info:AddParagraph({
+local infoPara = Tabs.Info:AddParagraph({
   Title = "DOORS Helper",
   Content = "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)",
 })
@@ -60,12 +72,13 @@ local function copyToClipboard(text)
   end
   return false
 end
-Tabs.Info:AddButton({
-  Title = "Our Discord Server",
-  Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+  Title = LT("Наш Discord сервер", "Our Discord Server"),
+  Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
-    GUI:Notify({ Title = "DOORS Helper", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
+    local _en = (getLang() == "en")
+    GUI:Notify({ Title = "DOORS Helper", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
@@ -225,19 +238,36 @@ local function doorESP()
   end
 end
 
-local lootTog = Tabs.Main:AddToggle("LootTog", { Title = "Auto-loot", Description = "Open containers, take items, gold, keys", Default = false })
+local lootTog = Tabs.Main:AddToggle("LootTog", { Title = LT("Авто-лут", "Auto-loot"), Description = "Open containers, take items, gold, keys", Default = false })
 lootTog:OnChanged(function() cfg.loot = lootTog.Value end)
-local espTog = Tabs.Main:AddToggle("ESPTog", { Title = "Entity ESP", Description = "Rush, Ambush, Figure, Dupe...", Default = false })
+local espTog = Tabs.Main:AddToggle("ESPTog", { Title = LT("ESP сущностей", "Entity ESP"), Description = "Rush, Ambush, Figure, Dupe...", Default = false })
 espTog:OnChanged(function() cfg.esp = espTog.Value end)
-local itemTog = Tabs.Main:AddToggle("ItemTog", { Title = "Item ESP", Description = "Keys, lockpicks, lighter, flashlight, bandage, books, gold", Default = false })
+local itemTog = Tabs.Main:AddToggle("ItemTog", { Title = LT("ESP предметов", "Item ESP"), Description = "Keys, lockpicks, lighter, flashlight, bandage, books, gold", Default = false })
 itemTog:OnChanged(function() cfg.itemEsp = itemTog.Value end)
-local doorTog = Tabs.Main:AddToggle("DoorTog", { Title = "Door ESP", Description = "Highlight next correct door green", Default = false })
+local doorTog = Tabs.Main:AddToggle("DoorTog", { Title = LT("ESP дверей", "Door ESP"), Description = "Highlight next correct door green", Default = false })
 doorTog:OnChanged(function() cfg.doorEsp = doorTog.Value end)
 local speedSld = Tabs.Main:AddSlider("SpeedSld", {
-  Title = "Speedhack", Description = "WalkSpeed multiplier (with bypass)",
+  Title = LT("Спидхак", "Speedhack"), Description = "WalkSpeed multiplier (with bypass)",
   Default = 100, Min = 100, Max = 200, Rounding = 0,
 })
 speedSld:OnChanged(function(v) cfg.speedMult = v / 100 end)
+-- живое обновление языка без перезапуска
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Main" or "Главная"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    infoPara:SetTitle("DOORS Helper")
+    infoPara:SetContent(en and "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)" or "Хелпер для DOORS\nby iwakewar team\n\n- Авто-открытие ящиков, сундуков, шкафов\n- Авто-лут предметы, голда, ключи\n- ESP сущностей (Rush, Ambush, Figure, Dupe...)")
+    discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
+    lootTog:SetTitle(en and "Auto-loot" or "Авто-лут")
+    espTog:SetTitle(en and "Entity ESP" or "ESP сущностей")
+    itemTog:SetTitle(en and "Item ESP" or "ESP предметов")
+    doorTog:SetTitle(en and "Door ESP" or "ESP дверей")
+    speedSld:SetTitle(en and "Speedhack" or "Спидхак")
+  end)
+end)
 local baseWS = 16
 do
   local ch0 = LP.Character

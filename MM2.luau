@@ -12,17 +12,26 @@ local genv0 = getgenv()
 if genv0.__mm2Fluent and type(genv0.__mm2Fluent.Destroy) == "function" then
   pcall(function() genv0.__mm2Fluent:Destroy() end)
 end
+-- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
-  local ok, src = pcall(readfile, "_iwakewar_gui.lua")
-  if ok and src and #src > 1000 then
-    return (loadstring(src))()
-  end
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  return (loadstring(game:HttpGet(url, true)))()
+  local src = game:HttpGet(url, true)
+  if not src or #src < 1000 then
+    error("iwakewar-gui source could not be loaded")
+  end
+  return (loadstring(src))()
 end
 local GUI = loadGUI()
 genv0.__mm2Fluent = GUI
-pcall(function() GUI:SetLang("ru") end)
+-- язык: saved or ru default, живьём через OnLangChanged
+local function getLang()
+  local g = getgenv and getgenv() or {}
+  return (g.__iwkLang == "en") and "en" or "ru"
+end
+pcall(function() GUI:SetLang(getLang()) end)
+local function LT(ru, en)
+  return (getLang() == "en") and en or ru
+end
 local Window = GUI:CreateWindow({
   Title = "MM2 Helper",
   SubTitle = "by iwakewar team",
@@ -32,26 +41,29 @@ local Window = GUI:CreateWindow({
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau"
 local Tabs = {
-  Info = Window:AddTab({ Title = "Info", Icon = "badge-check" }),
-  Main = Window:AddTab({ Title = "Main", Icon = "" }),
-  Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+  Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
+  Main = Window:AddTab({ Title = LT("Главная", "Main"), Icon = "" }),
+  Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
 }
 Window:SelectTab(1)
 
 -- Settings: пока только язык, по умолчанию русский
-Tabs.Settings:AddDropdown("Lang", {
+-- Settings: пока только язык, по умолчанию русский
+local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
   Values = { "Русский", "English" },
-  Default = "Русский",
+  Default = (getLang() == "en") and "English" or "Русский",
   Callback = function(v)
     pcall(function()
-      if v == "English" then GUI:SetLang("en") else GUI:SetLang("ru") end
+      local g = getgenv and getgenv() or {}
+      g.__iwkLang = (v == "English") and "en" or "ru"
+      GUI:SetLang(g.__iwkLang)
     end)
   end,
 })
-Tabs.Info:AddParagraph({
+local infoPara = Tabs.Info:AddParagraph({
   Title = "MM2 Helper",
-    Content = "Helper for Murder Mystery 2\nby iwakewar team\n\n- Coin farm (fly + noclip, nearest first)\n- Auto Get Gun (TP to dropped gun + back)\n- Auto Fling Sheriff (pendulum-ram off map at round start)\n- Murderer / Sheriff ESP\n- Ctrl+Click teleport, noclip",
+    Content = LT("Хелпер для Murder Mystery 2\nby iwakewar team\n\n- Фарм монет (флай + ноклип, сначала ближайшие)\n- Авто-подбор пистолета (ТП к пистолету и назад)\n- Авто-флинг шерифа (таран с карты в начале раунда)\n- ESP убийцы / шерифа\n- Ctrl+клик телепорт, ноклип", "Helper for Murder Mystery 2\nby iwakewar team\n\n- Coin farm (fly + noclip, nearest first)\n- Auto Get Gun (TP to dropped gun + back)\n- Auto Fling Sheriff (pendulum-ram off map at round start)\n- Murderer / Sheriff ESP\n- Ctrl+Click teleport, noclip"),
 })
 local function copyToClipboard(text)
   local g = getgenv and getgenv() or {}
@@ -61,12 +73,13 @@ local function copyToClipboard(text)
   end
   return false
 end
-Tabs.Info:AddButton({
-  Title = "Our Discord Server",
-  Description = "Copy invite link to clipboard",
+local discordBtn = Tabs.Info:AddButton({
+  Title = LT("Наш Discord сервер", "Our Discord Server"),
+  Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
-    GUI:Notify({ Title = "MM2 Helper", Content = ok and "Discord link copied" or "No clipboard API", Duration = 3 })
+    local _en = (getLang() == "en")
+    GUI:Notify({ Title = "MM2 Helper", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
@@ -238,11 +251,11 @@ local function shootUntilDead(target, tries)
   return false, lastWhy
 end
 
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = "Coin's Farm", Description = "Fly 36 studs/s, noclip, nearest first", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм монет", "Coin's Farm"), Description = "Fly 36 studs/s, noclip, nearest first", Default = false })
 farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
-local getGunTog = Tabs.Main:AddToggle("GetGun", { Title = "Auto Get Gun", Description = "TP to dropped gun, grab it, TP back", Default = false })
+local getGunTog = Tabs.Main:AddToggle("GetGun", { Title = LT("Авто-подбор пистолета", "Auto Get Gun"), Description = "TP to dropped gun, grab it, TP back", Default = false })
 getGunTog:OnChanged(function() cfg.getgun = getGunTog.Value end)
-local flingTog = Tabs.Main:AddToggle("FlingSher", { Title = "Auto Fling Sheriff", Description = "Pendulum-ram sheriff off map at round start", Default = false })
+local flingTog = Tabs.Main:AddToggle("FlingSher", { Title = LT("Авто-флинг шерифа", "Auto Fling Sheriff"), Description = "Pendulum-ram sheriff off map at round start", Default = false })
 flingTog:OnChanged(function()
   cfg.flingsher = flingTog.Value
   if cfg.flingsher then task.spawn(function() task.wait(2) tryFlingSheriff() end) end
@@ -252,12 +265,30 @@ local function espTog(id, title, desc, key, tool, color)
   t:OnChanged(function() cfg[key] = t.Value end)
   return t
 end
-espTog("MurdESP", "Murderer ESP", "Highlight murderer red", "murdEsp", "Knife", Color3.fromRGB(255, 40, 40))
-espTog("SherESP", "Sheriff ESP", "Highlight sheriff blue", "sherEsp", "Gun", Color3.fromRGB(60, 140, 255))
+local murdTog = espTog("MurdESP", LT("ESP убийцы", "Murderer ESP"), "Highlight murderer red", "murdEsp", "Knife", Color3.fromRGB(255, 40, 40))
+local sherTog = espTog("SherESP", LT("ESP шерифа", "Sheriff ESP"), "Highlight sheriff blue", "sherEsp", "Gun", Color3.fromRGB(60, 140, 255))
 local tpTog = Tabs.Main:AddToggle("ClickTP", { Title = "ClickTP", Description = "Ctrl + click to teleport", Default = false })
 tpTog:OnChanged(function() cfg.clicktp = tpTog.Value end)
 local ncTog = Tabs.Main:AddToggle("NoClip", { Title = "NoClip", Description = "Walk through walls", Default = false })
 ncTog:OnChanged(function() cfg.noclip = ncTog.Value end)
+
+-- живое обновление языка без перезапуска
+pcall(function()
+  GUI:OnLangChanged(function(l)
+    local en = (l == "en")
+    Tabs.Info.btn.Text = en and "Info" or "Инфо"
+    Tabs.Main.btn.Text = en and "Main" or "Главная"
+    Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
+    infoPara:SetTitle("MM2 Helper")
+    infoPara:SetContent(en and "Helper for Murder Mystery 2\nby iwakewar team\n\n- Coin farm (fly + noclip, nearest first)\n- Auto Get Gun (TP to dropped gun + back)\n- Auto Fling Sheriff (pendulum-ram off map at round start)\n- Murderer / Sheriff ESP\n- Ctrl+Click teleport, noclip" or "Хелпер для Murder Mystery 2\nby iwakewar team\n\n- Фарм монет (флай + ноклип, сначала ближайшие)\n- Авто-подбор пистолета (ТП к пистолету и назад)\n- Авто-флинг шерифа (таран с карты в начале раунда)\n- ESP убийцы / шерифа\n- Ctrl+клик телепорт, ноклип")
+    discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
+    farmTog:SetTitle(en and "Coin's Farm" or "Фарм монет")
+    getGunTog:SetTitle(en and "Auto Get Gun" or "Авто-подбор пистолета")
+    flingTog:SetTitle(en and "Auto Fling Sheriff" or "Авто-флинг шерифа")
+    if murdTog then murdTog:SetTitle(en and "Murderer ESP" or "ESP убийцы") end
+    if sherTog then sherTog:SetTitle(en and "Sheriff ESP" or "ESP шерифа") end
+  end)
+end)
 
 local function setESP(p, color)
   local c = p.Character
