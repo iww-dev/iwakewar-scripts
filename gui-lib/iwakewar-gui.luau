@@ -875,6 +875,7 @@ function GUI:CreateWindow(wcfg)
             ip.PaddingBottom = UDim.new(0, 8)
             ip.Parent = inner
             tab._box = inner
+            return tab
         end
 
         local function host()
