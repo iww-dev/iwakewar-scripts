@@ -79,7 +79,7 @@ end
 local Window = GUI:CreateWindow({
   Title = "StealAnEgg Farm",
   SubTitle = "by iwakewar team",
-  TabWidth = 140,
+  TabWidth = 150,
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
@@ -91,7 +91,6 @@ local Tabs = {
 }
 Window:SelectTab(2)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -127,12 +126,12 @@ local discordBtn = Tabs.Info:AddButton({
     GUI:Notify({ Title = "StealAnEgg Farm", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм", "Farm"), Description = "Steal -> place -> hatch", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм", "Farm"), Description = LT("Украсть -> положить -> вылупить", "Steal -> place -> hatch"), Default = false })
 farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
 local eggFeat = {}
 local function featTog(id, ru, en, desc_ru, desc_en, key)
   local t = Tabs.Main:AddToggle(id, { Title = LT(ru, en), Description = LT(desc_ru, desc_en), Default = true })
-  eggFeat[id] = { obj = t, ru = ru, en = en }
+  eggFeat[id] = { obj = t, ru = ru, en = en, desc_ru = desc_ru, desc_en = desc_en }
   t:OnChanged(function() cfg[key] = t.Value end)
   return t
 end
@@ -144,7 +143,7 @@ featTog("WearBest", "Надевать лучших", "Wear best pets", "Наде
 featTog("AutoHatch", "Авто-вылупление", "Auto-hatch", "Вылуплять яйца по таймеру", "Hatch eggs when their timer ends", "autoHatch")
 local speedDrop = Tabs.Main:AddDropdown("SpeedDrop", {
   Title = LT("Спидхак", "Speedhack"),
-  Description = "WalkSpeed multiplier",
+  Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.15", "x1.17", "x1.18" },
   Multi = false,
   Default = 2,
@@ -169,8 +168,10 @@ pcall(function()
     infoPara:SetContent(en and "Full auto-farmer for Steal An Egg\nby iwakewar team\n\n- Steals eggs on foot (no teleports, anticheat-safe)\n- Instant escape the moment of steal\n- Places eggs on a free PetArea grid slot\n- Auto-hatches ready eggs, wears best pets\n- Upgrades treadmill, buys and equips trails\n- 1 minute on treadmill every 3 circles\n- Adaptive speedhack with server rollback control\n\nEnable Farm and watch the Log tab." or "Полный автофарм для Steal An Egg\nby iwakewar team\n\n- Крадёт яйца пешком (без телепортов, безопасно)\n- Мгновенный отрыв в момент кражи\n- Кладёт яйца в свободный слот PetArea\n- Авто-вылупление, надевает лучших петов\n- Улучшает дорожку, покупает следы\n- 1 минута на дорожке каждые 3 круга\n- Адаптивный спидхак с контролем отката\n\nВключи Farm и смотри вкладку Log.")
     discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
     farmTog:SetTitle(en and "Farm" or "Фарм")
-    for _, e in pairs(eggFeat) do e.obj:SetTitle(en and e.en or e.ru) end
+    farmTog:SetDesc(en and "Steal -> place -> hatch" or "Украсть -> положить -> вылупить")
+    for _, e in pairs(eggFeat) do e.obj:SetTitle(en and e.en or e.ru) e.obj:SetDesc(en and e.desc_en or e.desc_ru) end
     speedDrop:SetTitle(en and "Speedhack" or "Спидхак")
+    if speedDrop.SetDesc then speedDrop:SetDesc(en and "WalkSpeed multiplier" or "Множитель WalkSpeed") end
     if treadBtn then treadBtn.Text = en and "Step off treadmill  [Treadmill AskDoff]" or "Сойти с дорожки  [Дорожка AskDoff]" end
   end)
 end)

@@ -21,7 +21,6 @@ local genv0 = getG()
 if genv0.__hwFluent and type(genv0.__hwFluent.Destroy) == "function" then
   pcall(function() genv0.__hwFluent:Destroy() end)
 end
--- GUI loader: iwakewar-gui with local + github fallback.
 -- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
@@ -57,7 +56,7 @@ end
 local Window = GUI:CreateWindow({
   Title = "Hidden Within",
   SubTitle = "by iwakewar team",
-  TabWidth = 140,
+  TabWidth = 150,
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
@@ -69,7 +68,6 @@ local Tabs = {
 }
 Window:SelectTab(1)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -106,10 +104,10 @@ local discordBtn = Tabs.Info:AddButton({
 })
 -- mobile GUI toggle is built into iwakewar-gui (old HWtoggle phone button removed)
 
-local espTog = Tabs.Main:AddToggle("EspTog", { Title = "ESP", Description = "Roles, HP, distance", Default = true })
+local espTog = Tabs.Main:AddToggle("EspTog", { Title = LT("ESP", "ESP"), Description = LT("Роли, ХП, дистанция", "Roles, HP, distance"), Default = true })
 espTog:OnChanged(function() cfg.esp = espTog.Value end)
 local aimBtn = nil
-local aimTog = Tabs.Main:AddToggle("AimTog", { Title = LT("Аимбот", "Aimbot"), Description = "Killer: snap to survivors. Survivor: snap to killers.", Default = true })
+local aimTog = Tabs.Main:AddToggle("AimTog", { Title = LT("Аимбот", "Aimbot"), Description = LT("Убийца: довод на выживших. Выживший: на убийц", "Killer: snap to survivors. Survivor: snap to killers."), Default = true })
 aimTog:OnChanged(function()
   cfg.aimbot = aimTog.Value
   if aimBtn then pcall(function()
@@ -117,23 +115,23 @@ aimTog:OnChanged(function()
   end) end
 end)
 local distSld = Tabs.Main:AddSlider("DistSld", {
-  Title = LT("Макс. дистанция аима", "Max aim distance"), Description = "Studs",
+  Title = LT("Макс. дистанция аима", "Max aim distance"), Description = LT("Стады", "Studs"),
   Default = 50, Min = 10, Max = 500, Rounding = 0,
 })
 distSld:OnChanged(function(v) cfg.maxDist = v end)
 local speedSld = Tabs.Main:AddSlider("SpeedSld", {
-  Title = LT("Спидхак", "Speed hack"), Description = "WalkSpeed",
+  Title = LT("Спидхак", "Speed hack"), Description = LT("WalkSpeed", "WalkSpeed"),
   Default = 34, Min = 16, Max = 120, Rounding = 0,
 })
 speedSld:OnChanged(function(v) cfg.speed = v end)
-local hbTog = Tabs.Main:AddToggle("HbTog", { Title = LT("Расширитель хитбокса", "Hitbox Expander"), Description = "Inflate enemy Head+Torso locally", Default = true })
+local hbTog = Tabs.Main:AddToggle("HbTog", { Title = LT("Расширитель хитбокса", "Hitbox Expander"), Description = LT("Увеличить Head+Torso врагов локально", "Inflate enemy Head+Torso locally"), Default = true })
 hbTog:OnChanged(function() cfg.hitbox = hbTog.Value end)
 local hbSld = Tabs.Main:AddSlider("HbSld", {
-  Title = LT("Размер хитбокса", "Hitbox size"), Description = "Multiplier",
+  Title = LT("Размер хитбокса", "Hitbox size"), Description = LT("Множитель", "Multiplier"),
   Default = 1.4, Min = 1, Max = 5, Rounding = 1,
 })
 hbSld:OnChanged(function(v) cfg.hitboxSize = v end)
-local gdTog = Tabs.Main:AddToggle("GdTog", { Title = LT("Дисбаланс пушки", "Gun Disbalance"), Description = "FireRate/Range/Clip/Reload maxed", Default = true })
+local gdTog = Tabs.Main:AddToggle("GdTog", { Title = LT("Дисбаланс пушки", "Gun Disbalance"), Description = LT("FireRate/Range/Clip/Reload на максимуме", "FireRate/Range/Clip/Reload maxed"), Default = true })
 gdTog:OnChanged(function() cfg.gundis = gdTog.Value end)
 
 -- живое обновление языка без перезапуска
@@ -146,13 +144,22 @@ pcall(function()
     infoPara:SetTitle("Hidden Within")
     infoPara:SetContent(en and "ESP + Aimbot for Hidden Within\nby iwakewar team\n\n- ESP: roles, HP, distance\n- Aimbot: instant snap to nearest survivor (killer only)" or "ESP + Аимбот для Hidden Within\nby iwakewar team\n\n- ESP: роли, ХП, дистанция\n- Аимбот: мгновенный довод на ближнего выжившего (только убийца)")
     discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
+    espTog:SetTitle(en and "ESP" or "ESP")
+    espTog:SetDesc(en and "Roles, HP, distance" or "Роли, ХП, дистанция")
     aimTog:SetTitle(en and "Aimbot" or "Аимбот")
+    aimTog:SetDesc(en and "Killer: snap to survivors. Survivor: snap to killers." or "Убийца: довод на выживших. Выживший: на убийц")
     distSld:SetTitle(en and "Max aim distance" or "Макс. дистанция аима")
+    distSld:SetDesc(en and "Studs" or "Стады")
     speedSld:SetTitle(en and "Speed hack" or "Спидхак")
+    speedSld:SetDesc(en and "WalkSpeed" or "WalkSpeed")
     hbTog:SetTitle(en and "Hitbox Expander" or "Расширитель хитбокса")
+    hbTog:SetDesc(en and "Inflate enemy Head+Torso locally" or "Увеличить Head+Torso врагов локально")
     hbSld:SetTitle(en and "Hitbox size" or "Размер хитбокса")
+    hbSld:SetDesc(en and "Multiplier" or "Множитель")
     gdTog:SetTitle(en and "Gun Disbalance" or "Дисбаланс пушки")
+    gdTog:SetDesc(en and "FireRate/Range/Clip/Reload maxed" or "FireRate/Range/Clip/Reload на максимуме")
     if godTog then godTog:SetTitle(en and "Godmode" or "Годмод") end
+    if godTog then godTog:SetDesc(en and "Server gets fake hitbox position" or "Сервер получает фейковую позицию хитбокса") end
   end)
 end)
 
@@ -193,7 +200,7 @@ do
   end)
 end
 end
-local godTog = Tabs.Main:AddToggle("GodTog", { Title = LT("Годмод", "Godmode"), Description = "Server gets fake hitbox position", Default = false })
+local godTog = Tabs.Main:AddToggle("GodTog", { Title = LT("Годмод", "Godmode"), Description = LT("Сервер получает фейковую позицию хитбокса", "Server gets fake hitbox position"), Default = false })
 godTog:OnChanged(function() cfg.god = godTog.Value end)
 
 local genv = getG()

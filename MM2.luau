@@ -35,7 +35,7 @@ end
 local Window = GUI:CreateWindow({
   Title = "MM2 Helper",
   SubTitle = "by iwakewar team",
-  TabWidth = 140,
+  TabWidth = 150,
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
@@ -47,7 +47,6 @@ local Tabs = {
 }
 Window:SelectTab(1)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -251,11 +250,11 @@ local function shootUntilDead(target, tries)
   return false, lastWhy
 end
 
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм монет", "Coin's Farm"), Description = "Fly 36 studs/s, noclip, nearest first", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Фарм монет", "Coin's Farm"), Description = LT("Флай 36 ст/с, ноклип, сначала ближние", "Fly 36 studs/s, noclip, nearest first"), Default = false })
 farmTog:OnChanged(function() cfg.farm = farmTog.Value end)
-local getGunTog = Tabs.Main:AddToggle("GetGun", { Title = LT("Авто-подбор пистолета", "Auto Get Gun"), Description = "TP to dropped gun, grab it, TP back", Default = false })
+local getGunTog = Tabs.Main:AddToggle("GetGun", { Title = LT("Авто-подбор пистолета", "Auto Get Gun"), Description = LT("ТП к упавшему пистолету и назад", "TP to dropped gun, grab it, TP back"), Default = false })
 getGunTog:OnChanged(function() cfg.getgun = getGunTog.Value end)
-local flingTog = Tabs.Main:AddToggle("FlingSher", { Title = LT("Авто-флинг шерифа", "Auto Fling Sheriff"), Description = "Pendulum-ram sheriff off map at round start", Default = false })
+local flingTog = Tabs.Main:AddToggle("FlingSher", { Title = LT("Авто-флинг шерифа", "Auto Fling Sheriff"), Description = LT("Таран шерифа с карты в начале раунда", "Pendulum-ram sheriff off map at round start"), Default = false })
 flingTog:OnChanged(function()
   cfg.flingsher = flingTog.Value
   if cfg.flingsher then task.spawn(function() task.wait(2) tryFlingSheriff() end) end
@@ -265,11 +264,11 @@ local function espTog(id, title, desc, key, tool, color)
   t:OnChanged(function() cfg[key] = t.Value end)
   return t
 end
-local murdTog = espTog("MurdESP", LT("ESP убийцы", "Murderer ESP"), "Highlight murderer red", "murdEsp", "Knife", Color3.fromRGB(255, 40, 40))
-local sherTog = espTog("SherESP", LT("ESP шерифа", "Sheriff ESP"), "Highlight sheriff blue", "sherEsp", "Gun", Color3.fromRGB(60, 140, 255))
-local tpTog = Tabs.Main:AddToggle("ClickTP", { Title = "ClickTP", Description = "Ctrl + click to teleport", Default = false })
+local murdTog = espTog("MurdESP", LT("ESP убийцы", "Murderer ESP"), LT("Подсветить убийцу красным", "Highlight murderer red"), "murdEsp", "Knife", Color3.fromRGB(255, 40, 40))
+local sherTog = espTog("SherESP", LT("ESP шерифа", "Sheriff ESP"), LT("Подсветить шерифа синим", "Highlight sheriff blue"), "sherEsp", "Gun", Color3.fromRGB(60, 140, 255))
+local tpTog = Tabs.Main:AddToggle("ClickTP", { Title = LT("ClickTP", "ClickTP"), Description = LT("Ctrl + клик — телепорт", "Ctrl + click to teleport"), Default = false })
 tpTog:OnChanged(function() cfg.clicktp = tpTog.Value end)
-local ncTog = Tabs.Main:AddToggle("NoClip", { Title = "NoClip", Description = "Walk through walls", Default = false })
+local ncTog = Tabs.Main:AddToggle("NoClip", { Title = LT("NoClip", "NoClip"), Description = LT("Ходить сквозь стены", "Walk through walls"), Default = false })
 ncTog:OnChanged(function() cfg.noclip = ncTog.Value end)
 
 -- живое обновление языка без перезапуска
@@ -283,10 +282,19 @@ pcall(function()
     infoPara:SetContent(en and "Helper for Murder Mystery 2\nby iwakewar team\n\n- Coin farm (fly + noclip, nearest first)\n- Auto Get Gun (TP to dropped gun + back)\n- Auto Fling Sheriff (pendulum-ram off map at round start)\n- Murderer / Sheriff ESP\n- Ctrl+Click teleport, noclip" or "Хелпер для Murder Mystery 2\nby iwakewar team\n\n- Фарм монет (флай + ноклип, сначала ближайшие)\n- Авто-подбор пистолета (ТП к пистолету и назад)\n- Авто-флинг шерифа (таран с карты в начале раунда)\n- ESP убийцы / шерифа\n- Ctrl+клик телепорт, ноклип")
     discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
     farmTog:SetTitle(en and "Coin's Farm" or "Фарм монет")
+    farmTog:SetDesc(en and "Fly 36 studs/s, noclip, nearest first" or "Флай 36 ст/с, ноклип, сначала ближние")
     getGunTog:SetTitle(en and "Auto Get Gun" or "Авто-подбор пистолета")
+    getGunTog:SetDesc(en and "TP to dropped gun, grab it, TP back" or "ТП к упавшему пистолету и назад")
     flingTog:SetTitle(en and "Auto Fling Sheriff" or "Авто-флинг шерифа")
+    flingTog:SetDesc(en and "Pendulum-ram sheriff off map at round start" or "Таран шерифа с карты в начале раунда")
     if murdTog then murdTog:SetTitle(en and "Murderer ESP" or "ESP убийцы") end
+    if murdTog then murdTog:SetDesc(en and "Highlight murderer red" or "Подсветить убийцу красным") end
     if sherTog then sherTog:SetTitle(en and "Sheriff ESP" or "ESP шерифа") end
+    if sherTog then sherTog:SetDesc(en and "Highlight sheriff blue" or "Подсветить шерифа синим") end
+    if tpTog then tpTog:SetTitle(en and "ClickTP" or "ClickTP") end
+    if tpTog then tpTog:SetDesc(en and "Ctrl + click to teleport" or "Ctrl + клик — телепорт") end
+    if ncTog then ncTog:SetTitle(en and "NoClip" or "NoClip") end
+    if ncTog then ncTog:SetDesc(en and "Walk through walls" or "Ходить сквозь стены") end
   end)
 end)
 

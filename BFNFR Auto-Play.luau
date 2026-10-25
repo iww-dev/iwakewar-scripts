@@ -1,6 +1,6 @@
 -- BFNFR Auto-Play
 -- by iwakewar team
--- Premium Fluent GUI. Presses the REAL lane keys through VirtualInputManager
+-- Premium GUI. Presses the REAL lane keys through VirtualInputManager
 -- so the game's own KeyPress -> NoteInput runs: arrow/skin animation, character
 -- animation, combo, sound and the remote, exactly like a human press.
 -- Works with the player's own keybinds.
@@ -23,6 +23,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local mf = plr.PlayerGui:WaitForChild("Main"):WaitForChild("MatchFrame")
 local DataF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DataF")
 
+local genv0 = getgenv()
+if genv0.__bfnfrFluent and type(genv0.__bfnfrFluent.Destroy) == "function" then
+  pcall(function() genv0.__bfnfrFluent:Destroy() end)
+end
 -- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
 local function loadGUI()
   local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
@@ -34,6 +38,7 @@ local function loadGUI()
 end
 
 local GUI = loadGUI()
+genv0.__bfnfrFluent = GUI
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 -- язык: saved or ru default, живьём через OnLangChanged
 local function getLang()
@@ -60,7 +65,6 @@ local Tabs = {
 local Options = GUI.Options
 Window:SelectTab(1)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -283,11 +287,11 @@ local MainSection = Tabs.Main:AddSection("Main Functions")
 
 local Status = Tabs.Main:AddParagraph({
     Title = LT("Статус", "Status"),
-    Content = "Idle — waiting for a track…",
+    Content = LT("Ожидание — жду трек…", "Idle — waiting for a track…"),
 })
 local Live = Tabs.Main:AddParagraph({
     Title = LT("Лайв", "Live"),
-    Content = "state: OFF • side: - • speed: - • hits: 0",
+    Content = LT("состояние: ВЫКЛ • сторона: - • скорость: - • хиты: 0", "state: OFF • side: - • speed: - • hits: 0"),
 })
 
 local function notify(title: string, content: string, duration: number)
@@ -301,7 +305,7 @@ end
 
 local enabledTog = MainSection:AddToggle("Enabled", {
     Title = LT("Авто-игра", "Auto-Play"),
-    Description = "Toggle automatic key presses",
+    Description = LT("Автонажатия клавиш", "Toggle automatic key presses"),
     Default = false,
     Callback = function(state)
         enabled = state
@@ -314,7 +318,7 @@ local enabledTog = MainSection:AddToggle("Enabled", {
 
 local antiAfkTog = MainSection:AddToggle("AntiAfk", {
     Title = LT("Анти-АФК", "Anti-AFK"),
-    Description = "Jump every 10s while in a track",
+    Description = LT("Прыжок каждые 10с в треке", "Jump every 10s while in a track"),
     Default = true,
     Callback = function(state)
         antiAfk = state
@@ -323,7 +327,7 @@ local antiAfkTog = MainSection:AddToggle("AntiAfk", {
 
 local noNotifTog2 = MainSection:AddToggle("NoNotifications", {
     Title = LT("Без уведомлений", "Do not send notifications"),
-    Description = "Hide all Fluent notifications",
+    Description = LT("Скрыть все уведомления", "Hide all notifications"),
     Default = false,
     Callback = function(state)
         noNotifications = state
@@ -332,7 +336,7 @@ local noNotifTog2 = MainSection:AddToggle("NoNotifications", {
 
 local perfectDrop = MainSection:AddDropdown("PerfectMode", {
     Title = LT("Режим Perfect", "Perfect mode"),
-    Description = "Never Perfect, mixed 57/43, or always Perfect",
+    Description = LT("Никогда Perfect, микс 57/43 или всегда", "Never Perfect, mixed 57/43, or always Perfect"),
     Values = {
         "Never Perfect",
         "Mix (57% Perfect)",
@@ -353,7 +357,7 @@ local perfectDrop = MainSection:AddDropdown("PerfectMode", {
 
 local togKey2 = MainSection:AddKeybind("ToggleKey", {
     Title = LT("Клавиша-тогл", "Toggle keybind"),
-    Description = "Quickly turn Auto-Play on/off",
+    Description = LT("Быстро вкл/выкл авто-игру", "Quickly turn Auto-Play on/off"),
     Mode = "Toggle",
     Default = "H",
     Callback = function()
@@ -383,16 +387,24 @@ pcall(function()
     Tabs.Main.btn.Text = en and "Controls" or "Управление"
     Tabs.Settings.btn.Text = en and "Settings" or "Настройки"
     if Status then Status:SetTitle(en and "Status" or "Статус") end
+    if Status then Status:SetContent(en and "Idle — waiting for a track…" or "Ожидание — жду трек…") end
     if Live then Live:SetTitle(en and "Live" or "Лайв") end
+    if Live then Live:SetContent(en and "state: OFF • side: - • speed: - • hits: 0" or "состояние: ВЫКЛ • сторона: - • скорость: - • хиты: 0") end
     if bfnfrInfo then
       bfnfrInfo:SetTitle("BFNFR Auto-Play")
       bfnfrInfo:SetContent(en and "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle." or "Премиум авто-игра для Basically FNF: Remix\nby iwakewar team\n\n- Играет твою линию твоими биндами\n- Полные анимации Hit/Release (реальные нажатия)\n- Холды держит и отпускает корректно\n- Дропдаун Perfect: Never / Mix 57%/43% / Always\n- Самокалибровка тайминга (сохраняется)\n- Встроенный анти-АФК\n\nЖми H (или свой бинд) для тогла.")
     end
     if discordBtn then discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]" end
     if enabledTog then enabledTog:SetTitle(en and "Auto-Play" or "Авто-игра") end
+    if enabledTog then pcall(function() enabledTog:SetDesc(en and "Toggle automatic key presses" or "Автонажатия клавиш") end) end
     if antiAfkTog then antiAfkTog:SetTitle(en and "Anti-AFK" or "Анти-АФК") end
+    if antiAfkTog then pcall(function() antiAfkTog:SetDesc(en and "Jump every 10s while in a track" or "Прыжок каждые 10с в треке") end) end
     if noNotifTog2 then noNotifTog2:SetTitle(en and "Do not send notifications" or "Без уведомлений") end
+    if noNotifTog2 then pcall(function() noNotifTog2:SetDesc(en and "Hide all notifications" or "Скрыть все уведомления") end) end
     if perfectDrop then perfectDrop:SetTitle(en and "Perfect mode" or "Режим Perfect") end
+    if perfectDrop then pcall(function() perfectDrop:SetDesc(en and "Never Perfect, mixed 57/43, or always Perfect" or "Никогда Perfect, микс 57/43 или всегда") end) end
+    if togKey2 then pcall(function() togKey2:SetTitle(en and "Toggle keybind" or "Клавиша-тогл") end) end
+    if togKey2 then pcall(function() togKey2:SetDesc(en and "Quickly turn Auto-Play on/off" or "Быстро вкл/выкл авто-игру") end) end
   end)
 end)
 

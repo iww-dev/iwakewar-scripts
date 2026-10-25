@@ -34,7 +34,7 @@ end
 local Window = GUI:CreateWindow({
   Title = "DOORS Helper",
   SubTitle = "by iwakewar team",
-  TabWidth = 140,
+  TabWidth = 150,
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
@@ -46,7 +46,6 @@ local Tabs = {
 }
 Window:SelectTab(1)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -62,7 +61,9 @@ local langDrop = Tabs.Settings:AddDropdown("Lang", {
 })
 local infoPara = Tabs.Info:AddParagraph({
   Title = "DOORS Helper",
-  Content = "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)",
+  Content = LT(
+    "Хелпер для DOORS\nby iwakewar team\n\n- Авто-открытие ящиков, сундуков, шкафов\n- Авто-лут предметы, голда, ключи\n- ESP сущностей (Rush, Ambush, Figure, Dupe...)",
+    "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)"),
 })
 local function copyToClipboard(text)
   local g = getgenv and getgenv() or {}
@@ -238,16 +239,16 @@ local function doorESP()
   end
 end
 
-local lootTog = Tabs.Main:AddToggle("LootTog", { Title = LT("Авто-лут", "Auto-loot"), Description = "Open containers, take items, gold, keys", Default = false })
+local lootTog = Tabs.Main:AddToggle("LootTog", { Title = LT("Авто-лут", "Auto-loot"), Description = LT("Открывать ящики, лутать предметы, голду, ключи", "Open containers, take items, gold, keys"), Default = false })
 lootTog:OnChanged(function() cfg.loot = lootTog.Value end)
-local espTog = Tabs.Main:AddToggle("ESPTog", { Title = LT("ESP сущностей", "Entity ESP"), Description = "Rush, Ambush, Figure, Dupe...", Default = false })
+local espTog = Tabs.Main:AddToggle("ESPTog", { Title = LT("ESP сущностей", "Entity ESP"), Description = LT("Rush, Ambush, Figure, Dupe...", "Rush, Ambush, Figure, Dupe..."), Default = false })
 espTog:OnChanged(function() cfg.esp = espTog.Value end)
-local itemTog = Tabs.Main:AddToggle("ItemTog", { Title = LT("ESP предметов", "Item ESP"), Description = "Keys, lockpicks, lighter, flashlight, bandage, books, gold", Default = false })
+local itemTog = Tabs.Main:AddToggle("ItemTog", { Title = LT("ESP предметов", "Item ESP"), Description = LT("Ключи, отмычки, зажигалка, фонарь, бинты, книги, голда", "Keys, lockpicks, lighter, flashlight, bandage, books, gold"), Default = false })
 itemTog:OnChanged(function() cfg.itemEsp = itemTog.Value end)
-local doorTog = Tabs.Main:AddToggle("DoorTog", { Title = LT("ESP дверей", "Door ESP"), Description = "Highlight next correct door green", Default = false })
+local doorTog = Tabs.Main:AddToggle("DoorTog", { Title = LT("ESP дверей", "Door ESP"), Description = LT("Подсветка следующей двери", "Highlight next correct door green"), Default = false })
 doorTog:OnChanged(function() cfg.doorEsp = doorTog.Value end)
 local speedSld = Tabs.Main:AddSlider("SpeedSld", {
-  Title = LT("Спидхак", "Speedhack"), Description = "WalkSpeed multiplier (with bypass)",
+  Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed (с обходом)", "WalkSpeed multiplier (with bypass)"),
   Default = 100, Min = 100, Max = 200, Rounding = 0,
 })
 speedSld:OnChanged(function(v) cfg.speedMult = v / 100 end)
@@ -262,10 +263,15 @@ pcall(function()
     infoPara:SetContent(en and "Helper for DOORS\nby iwakewar team\n\n- Auto-open drawers, chests, lockers\n- Auto-loot items, gold, keys\n- Entity ESP (Rush, Ambush, Figure, Dupe...)" or "Хелпер для DOORS\nby iwakewar team\n\n- Авто-открытие ящиков, сундуков, шкафов\n- Авто-лут предметы, голда, ключи\n- ESP сущностей (Rush, Ambush, Figure, Dupe...)")
     discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
     lootTog:SetTitle(en and "Auto-loot" or "Авто-лут")
+    lootTog:SetDesc(en and "Open containers, take items, gold, keys" or "Открывать ящики, лутать предметы, голду, ключи")
     espTog:SetTitle(en and "Entity ESP" or "ESP сущностей")
+    espTog:SetDesc(en and "Rush, Ambush, Figure, Dupe..." or "Rush, Ambush, Figure, Dupe...")
     itemTog:SetTitle(en and "Item ESP" or "ESP предметов")
+    itemTog:SetDesc(en and "Keys, lockpicks, lighter, flashlight, bandage, books, gold" or "Ключи, отмычки, зажигалка, фонарь, бинты, книги, голда")
     doorTog:SetTitle(en and "Door ESP" or "ESP дверей")
+    doorTog:SetDesc(en and "Highlight next correct door green" or "Подсветка следующей двери")
     speedSld:SetTitle(en and "Speedhack" or "Спидхак")
+    speedSld:SetDesc(en and "WalkSpeed multiplier (with bypass)" or "Множитель WalkSpeed (с обходом)")
   end)
 end)
 local baseWS = 16

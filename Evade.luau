@@ -37,7 +37,7 @@ end
 local Window = GUI:CreateWindow({
   Title = "Evade Helper",
   SubTitle = "by iwakewar team",
-  TabWidth = 140,
+  TabWidth = 150,
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
@@ -49,7 +49,6 @@ local Tabs = {
 }
 Window:SelectTab(1)
 
--- Settings: пока только язык, по умолчанию русский
 -- Settings: пока только язык, по умолчанию русский
 local langDrop = Tabs.Settings:AddDropdown("Lang", {
   Title = "Language / Язык",
@@ -65,7 +64,9 @@ local langDrop = Tabs.Settings:AddDropdown("Lang", {
 })
 local infoPara = Tabs.Info:AddParagraph({
   Title = "Evade Helper",
-  Content = "Helper for Evade\nby iwakewar team\n\n- BunnyHop (WASD + Space, jump every 0.082s)\n- Speedhack dropdown\n- Bots / Players / NeedHelp chams\n- Auto Farm EXP (anchor at Y900, bots can't reach)",
+  Content = LT(
+    "Хелпер для Evade\nby iwakewar team\n\n- Баннихоп (WASD + Space, прыжок каждые 0.082с)\n- Спидхак дропдаун\n- Чамсы ботов / игроков / нуждающихся\n- Автофарм EXP (якорь на Y900, боты не достают)",
+    "Helper for Evade\nby iwakewar team\n\n- BunnyHop (WASD + Space, jump every 0.082s)\n- Speedhack dropdown\n- Bots / Players / NeedHelp chams\n- Auto Farm EXP (anchor at Y900, bots can't reach)"),
 })
 local function copyToClipboard(text)
   local g = getgenv and getgenv() or {}
@@ -91,15 +92,15 @@ local function clearChams()
     if d.Name == "EVADEcham" or d.Name == "EVADEchamH" then pcall(function() d:Destroy() end) end
   end
 end
-local bhopTog = Tabs.Main:AddToggle("BhopTog", { Title = LT("Баннихоп", "BunnyHop"), Description = "Jump spam while moving (0.082s)", Default = false })
+local bhopTog = Tabs.Main:AddToggle("BhopTog", { Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Default = false })
 bhopTog:OnChanged(function() cfg.bhop = bhopTog.Value end)
 local hopDrop = Tabs.Main:AddDropdown("HopDrop", {
-  Title = LT("Режим бхопа", "Bhop mode"), Description = "OnlyGround = jump on landing, Any = always",
+  Title = LT("Режим бхопа", "Bhop mode"), Description = LT("OnlyGround = прыжок при приземлении, Any = всегда", "OnlyGround = jump on landing, Any = always"),
   Values = { "OnlyGround", "Any" }, Multi = false, Default = 1,
 })
 hopDrop:OnChanged(function(v) cfg.hopMode = v end)
 local speedDrop = Tabs.Main:AddDropdown("SpeedDrop", {
-  Title = LT("Спидхак", "Speedhack"), Description = "WalkSpeed multiplier",
+  Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.05", "x1.10", "x1.11", "x1.14", "x1.18", "x1.19+" },
   Multi = false, Default = 1,
 })
@@ -107,15 +108,15 @@ speedDrop:OnChanged(function(v)
   if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
   else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end
 end)
-local botTog = Tabs.Main:AddToggle("BotCham", { Title = LT("Чамсы ботов", "Bots Chams"), Description = "Highlight nextbots red", Default = false })
+local botTog = Tabs.Main:AddToggle("BotCham", { Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Default = false })
 botTog:OnChanged(function() cfg.botCham = botTog.Value clearChams() end)
-local plrTog = Tabs.Main:AddToggle("PlrCham", { Title = LT("Чамсы игроков", "Player's Chams"), Description = "Highlight players blue", Default = false })
+local plrTog = Tabs.Main:AddToggle("PlrCham", { Title = LT("Чамсы игроков", "Player's Chams"), Description = LT("Подсветка игроков синим", "Highlight players blue"), Default = false })
 plrTog:OnChanged(function() cfg.plrCham = plrTog.Value clearChams() end)
-local helpTog = Tabs.Main:AddToggle("HelpCham", { Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = "Highlight downed players green", Default = false })
+local helpTog = Tabs.Main:AddToggle("HelpCham", { Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = LT("Подсветка упавших зелёным", "Highlight downed players green"), Default = false })
 helpTog:OnChanged(function() cfg.helpCham = helpTog.Value clearChams() end)
-local shieldTog = Tabs.Main:AddToggle("ShieldTog", { Title = LT("Щит от ботов", "Bot Shield"), Description = "Collision bubble around bots", Default = false })
+local shieldTog = Tabs.Main:AddToggle("ShieldTog", { Title = LT("Щит от ботов", "Bot Shield"), Description = LT("Пузырь коллизии вокруг ботов", "Collision bubble around bots"), Default = false })
 shieldTog:OnChanged(function() cfg.shield = shieldTog.Value end)
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = "Anchor at farm Y, zero gravity/velocity, bots can't reach", Default = false })
+local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = LT("Якорь на высоте фарма, боты не достают", "Anchor at farm Y, zero gravity/velocity, bots can't reach"), Default = false })
 farmTog:OnChanged(function()
   cfg.farmExp = farmTog.Value
   local ch = LP.Character
@@ -130,7 +131,7 @@ farmTog:OnChanged(function()
   end
 end)
 local farmYDrop = Tabs.Main:AddDropdown("FarmYDrop", {
-  Title = LT("Высота фарма", "Farm height"), Description = "Y to hang at (bots stay on ground)",
+  Title = LT("Высота фарма", "Farm height"), Description = LT("Высота зависания (боты на земле)", "Y to hang at (bots stay on ground)"),
   Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Multi = false, Default = 7,
 })
 farmYDrop:OnChanged(function(v)
@@ -151,14 +152,23 @@ pcall(function()
     infoPara:SetContent(en and "Helper for Evade\nby iwakewar team\n\n- BunnyHop (WASD + Space, jump every 0.082s)\n- Speedhack dropdown\n- Bots / Players / NeedHelp chams\n- Auto Farm EXP (anchor at Y900, bots can't reach)" or "Хелпер для Evade\nby iwakewar team\n\n- Баннихоп (WASD + Space, прыжок каждые 0.082с)\n- Спидхак дропдаун\n- Чамсы ботов / игроков / нуждающихся\n- Автофарм EXP (якорь на Y900, боты не достают)")
     discordBtn.Text = en and "Our Discord Server  [Copy invite link to clipboard]" or "Наш Discord сервер  [Скопировать ссылку-приглашение]"
     bhopTog:SetTitle(en and "BunnyHop" or "Баннихоп")
+    bhopTog:SetDesc(en and "Jump spam while moving (0.082s)" or "Спам прыжков в движении (0.082с)")
     hopDrop:SetTitle(en and "Bhop mode" or "Режим бхопа")
+    pcall(function() hopDrop:SetDesc(en and "OnlyGround = jump on landing, Any = always" or "OnlyGround = прыжок при приземлении, Any = всегда") end)
     speedDrop:SetTitle(en and "Speedhack" or "Спидхак")
+    pcall(function() speedDrop:SetDesc(en and "WalkSpeed multiplier" or "Множитель WalkSpeed") end)
     botTog:SetTitle(en and "Bots Chams" or "Чамсы ботов")
+    botTog:SetDesc(en and "Highlight nextbots red" or "Подсветка ботов красным")
     plrTog:SetTitle(en and "Player's Chams" or "Чамсы игроков")
+    plrTog:SetDesc(en and "Highlight players blue" or "Подсветка игроков синим")
     helpTog:SetTitle(en and "NeedHelpPlayers Chams" or "Чамсы упавших")
+    helpTog:SetDesc(en and "Highlight downed players green" or "Подсветка упавших зелёным")
     shieldTog:SetTitle(en and "Bot Shield" or "Щит от ботов")
+    shieldTog:SetDesc(en and "Collision bubble around bots" or "Пузырь коллизии вокруг ботов")
     farmTog:SetTitle(en and "Auto Farm EXP" or "Автофарм EXP")
+    farmTog:SetDesc(en and "Anchor at farm Y, zero gravity/velocity, bots can't reach" or "Якорь на высоте фарма, боты не достают")
     farmYDrop:SetTitle(en and "Farm height" or "Высота фарма")
+    pcall(function() farmYDrop:SetDesc(en and "Y to hang at (bots stay on ground)" or "Высота зависания (боты на земле)") end)
   end)
 end)
 local genv = getgenv()

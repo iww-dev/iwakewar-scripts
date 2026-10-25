@@ -289,6 +289,7 @@ end
 
 local function buildTerminal(Window)
     local tab = Window:AddTab({ Title = GUI:T("terminal") })
+    tab.btn.Visible = false -- вкладка скрыта, функционал жив
     local page = tab.page
     local out = Instance.new("ScrollingFrame")
     out.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
@@ -609,10 +610,6 @@ function GUI:CreateWindow(wcfg)
     local st = label(bar, sub, 13, C_DGREEN)
     st.Position = UDim2.new(0, 12, 0, 30)
     st.Size = UDim2.new(1, -140, 0, 18)
-    -- tty-отголосок alpine
-    local tty = label(bar, "root@alpine:~#", 11, Color3.fromRGB(90, 90, 90), Enum.TextXAlignment.Right)
-    tty.Position = UDim2.new(1, -250, 0, 30)
-    tty.Size = UDim2.new(0, 120, 0, 16)
     local x = Instance.new("TextButton")
     x.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
     x.BorderSizePixel = 0
@@ -900,6 +897,9 @@ function GUI:CreateWindow(wcfg)
             c.Size = UDim2.new(1, -16, 0, 28)
             c.AutomaticSize = Enum.AutomaticSize.Y
             c.TextWrapped = true
+            local padb = Instance.new("UIPadding")
+            padb.PaddingBottom = UDim.new(0, 10)
+            padb.Parent = f
             local o = {}
             function o:SetContent(t2) c.Text = tostring(t2) end
             function o:SetTitle(t2) t.Text = tostring(t2) end
@@ -911,6 +911,9 @@ function GUI:CreateWindow(wcfg)
             local b2 = btn(host(), tostring(bcfg.Title or "Button"), C_TXT)
             b2.Size = UDim2.new(1, 0, 0, 30)
             b2.TextXAlignment = Enum.TextXAlignment.Left
+            local bpad = Instance.new("UIPadding")
+            bpad.PaddingLeft = UDim.new(0, 10)
+            bpad.Parent = b2
             if bcfg.Description then
                 b2.Text = tostring(bcfg.Title) .. "  [" .. tostring(bcfg.Description) .. "]"
             end
@@ -949,6 +952,16 @@ function GUI:CreateWindow(wcfg)
             t.Size = UDim2.new(1, -30, 1, 0)
             t.TextYAlignment = Enum.TextYAlignment.Center
             t.TextTruncate = Enum.TextTruncate.AtEnd
+            local d = nil
+            if tcfg.Description ~= nil then
+                f.Size = UDim2.new(1, 0, 0, 40)
+                t.Size = UDim2.new(1, -30, 0, 20)
+                t.TextYAlignment = Enum.TextYAlignment.Top
+                d = label(f, tostring(tcfg.Description), 11, C_DIMTXT)
+                d.Position = UDim2.new(0, 26, 0, 20)
+                d.Size = UDim2.new(1, -30, 0, 16)
+                d.TextTruncate = Enum.TextTruncate.AtEnd
+            end
             local tog = { Value = false, _cbs = {} }
             local function paint()
                 mark.Visible = tog.Value
@@ -967,7 +980,7 @@ function GUI:CreateWindow(wcfg)
             function tog:OnChanged(fn) table.insert(tog._cbs, fn) end
             function tog:OnClick(fn) table.insert(tog._clicks or {}, fn) end
             function tog:SetTitle(v) t.Text = tostring(v) end
-            function tog:SetDesc(_) end
+            function tog:SetDesc(v) if d then d.Text = tostring(v) end end
             f.MouseButton1Click:Connect(function() tog:SetValue(not tog.Value) end)
             tog.Value = (tcfg.Default == true)
             paint()
@@ -993,6 +1006,14 @@ function GUI:CreateWindow(wcfg)
             local t = label(f, tostring(scfg.Title or id), 13, C_TXT)
             t.Position = UDim2.new(0, 2, 0, 0)
             t.Size = UDim2.new(1, -70, 0, 18)
+            local d = nil
+            if scfg.Description ~= nil then
+                f.Size = UDim2.new(1, 0, 0, 56)
+                d = label(f, tostring(scfg.Description), 11, C_DIMTXT)
+                d.Position = UDim2.new(0, 2, 0, 38)
+                d.Size = UDim2.new(1, -4, 0, 16)
+                d.TextTruncate = Enum.TextTruncate.AtEnd
+            end
             local val = label(f, "", 12, C_ACCENT, Enum.TextXAlignment.Right)
             val.Position = UDim2.new(1, -62, 0, 0)
             val.Size = UDim2.new(0, 60, 0, 18)
@@ -1035,7 +1056,7 @@ function GUI:CreateWindow(wcfg)
             end
             function sld:OnChanged(fn) table.insert(sld._cbs, fn) end
             function sld:SetTitle(v) t.Text = tostring(v) end
-            function sld:SetDesc(_) end
+            function sld:SetDesc(v) if d then d.Text = tostring(v) end end
             do
                 local drag = false
                 local function apply(x)
@@ -1082,6 +1103,14 @@ function GUI:CreateWindow(wcfg)
             b2.Position = UDim2.new(0.55, 8, 0.5, -11)
             b2.TextSize = 12
             local dd = { Value = cur, _cbs = {} }
+            local dd_d = nil
+            if dcfg.Description ~= nil then
+                f.Size = UDim2.new(1, 0, 0, 42)
+                dd_d = label(f, tostring(dcfg.Description), 11, C_DIMTXT)
+                dd_d.Position = UDim2.new(0, 2, 0, 26)
+                dd_d.Size = UDim2.new(1, -4, 0, 14)
+                dd_d.TextTruncate = Enum.TextTruncate.AtEnd
+            end
             local pop = nil
             local function close()
                 if pop then pop:Destroy() pop = nil end
@@ -1095,6 +1124,7 @@ function GUI:CreateWindow(wcfg)
             end
             function dd:OnChanged(fn) table.insert(dd._cbs, fn) end
             function dd:SetTitle(v) t.Text = tostring(v) end
+            function dd:SetDesc(v) if dd_d then dd_d.Text = tostring(v) end end
             b2.MouseButton1Click:Connect(function()
                 if pop then close() return end
                 b2.Text = tostring(dd.Value) .. " [-]"
@@ -1421,9 +1451,6 @@ function GUI:Loader(ocfg)
     local tt = label(win, title, 18, C_TXT)
     tt.Position = UDim2.new(0, 12, 0, 10)
     tt.Size = UDim2.new(1, -150, 0, 24)
-    local tty = label(win, "root@alpine:~#", 11, Color3.fromRGB(90, 90, 90), Enum.TextXAlignment.Right)
-    tty.Position = UDim2.new(1, -140, 0, 12)
-    tty.Size = UDim2.new(0, 128, 0, 16)
     local sb = label(win, sub, 13, C_DGREEN)
     sb.Position = UDim2.new(0, 12, 0, 34)
     sb.Size = UDim2.new(1, -24, 0, 16)

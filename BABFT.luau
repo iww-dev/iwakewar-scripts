@@ -37,7 +37,7 @@ local Window = GUI:CreateWindow({
   Size = UDim2.fromOffset(640, 460),
   ToggleKey = Enum.KeyCode.RightAlt,
 })
-GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/iwakewar-scripts/BABFT.luau"
+GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BABFT.luau"
 local Tabs = {
   Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
   Main = Window:AddTab({ Title = LT("Главная", "Main"), Icon = "" }),
