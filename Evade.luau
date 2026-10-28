@@ -85,53 +85,50 @@ local function clearChams()
     if d.Name == "EVADEcham" or d.Name == "EVADEchamH" then pcall(function() d:Destroy() end) end
   end
 end
-local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Value = false })
-bhopTog.Callback = function(v) cfg.bhop = v end
+local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Value = false,
+  Callback = function(v) cfg.bhop = v end })
 local hopDrop = Tabs.Main:Dropdown({
   Title = LT("Режим бхопа", "Bhop mode"), Description = LT("OnlyGround = прыжок при приземлении, Any = всегда", "OnlyGround = jump on landing, Any = always"),
   Values = { "OnlyGround", "Any" }, Value = "OnlyGround",
-})
-hopDrop.Callback = function(v) cfg.hopMode = v end
+  Callback = function(v) cfg.hopMode = v end })
 local speedDrop = Tabs.Main:Dropdown({
   Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.05", "x1.10", "x1.11", "x1.14", "x1.18", "x1.19+" },
   Value = "x1.0",
-})
-speedDrop.Callback = function(v) if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
-  else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end end
-local botTog = Tabs.Main:Toggle({ Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Value = false })
-botTog.Callback = function(v) cfg.botCham = v clearChams() end
-local plrTog = Tabs.Main:Toggle({ Title = LT("Чамсы игроков", "Player's Chams"), Description = LT("Подсветка игроков синим", "Highlight players blue"), Value = false })
-plrTog.Callback = function(v) cfg.plrCham = v clearChams() end
-local helpTog = Tabs.Main:Toggle({ Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = LT("Подсветка упавших зелёным", "Highlight downed players green"), Value = false })
-helpTog.Callback = function(v) cfg.helpCham = v clearChams() end
-local shieldTog = Tabs.Main:Toggle({ Title = LT("Щит от ботов", "Bot Shield"), Description = LT("Пузырь коллизии вокруг ботов", "Collision bubble around bots"), Value = false })
-shieldTog.Callback = function(v) cfg.shield = v end
-local farmTog = Tabs.Main:Toggle({ Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = LT("Якорь на высоте фарма, боты не достают", "Anchor at farm Y, zero gravity/velocity, bots can't reach"), Value = false })
-farmTog.Callback = function(v)
-  cfg.farmExp = v
-  local ch = LP.Character
-  local me = ch and ch:FindFirstChild("HumanoidRootPart")
-  if cfg.farmExp then
-    farmCX, farmCZ = FARM_X, FARM_Z
-    if savedGrav == nil then savedGrav = workspace.Gravity end
-    pcall(function() workspace.Gravity = 0 end)
-  else
-    if savedGrav ~= nil then
-      pcall(function() workspace.Gravity = savedGrav end)
-      savedGrav = nil
+  Callback = function(v) if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
+  else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end end })
+local botTog = Tabs.Main:Toggle({ Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Value = false,
+  Callback = function(v) cfg.botCham = v clearChams() end })
+local plrTog = Tabs.Main:Toggle({ Title = LT("Чамсы игроков", "Player's Chams"), Description = LT("Подсветка игроков синим", "Highlight players blue"), Value = false,
+  Callback = function(v) cfg.plrCham = v clearChams() end })
+local helpTog = Tabs.Main:Toggle({ Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = LT("Подсветка упавших зелёным", "Highlight downed players green"), Value = false,
+  Callback = function(v) cfg.helpCham = v clearChams() end })
+local shieldTog = Tabs.Main:Toggle({ Title = LT("Щит от ботов", "Bot Shield"), Description = LT("Пузырь коллизии вокруг ботов", "Collision bubble around bots"), Value = false,
+  Callback = function(v) cfg.shield = v end })
+local farmTog = Tabs.Main:Toggle({ Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = LT("Якорь на высоте фарма, боты не достают", "Anchor at farm Y, zero gravity/velocity, bots can't reach"), Value = false,
+  Callback = function(v)
+    cfg.farmExp = v
+    local ch = LP.Character
+    local me = ch and ch:FindFirstChild("HumanoidRootPart")
+    if cfg.farmExp then
+      farmCX, farmCZ = FARM_X, FARM_Z
+      if savedGrav == nil then savedGrav = workspace.Gravity end
+      pcall(function() workspace.Gravity = 0 end)
+    else
+      if savedGrav ~= nil then
+        pcall(function() workspace.Gravity = savedGrav end)
+        savedGrav = nil
+      end
+      if me then pcall(function() me.Anchored = false end) end
     end
-    if me then pcall(function() me.Anchored = false end) end
-  end
-end
+  end })
 local farmYDrop = Tabs.Main:Dropdown({
   Title = LT("Высота фарма", "Farm height"), Description = LT("Высота зависания (боты на земле)", "Y to hang at (bots stay on ground)"),
   Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Value = "12000",
-})
-farmYDrop.Callback = function(v) local n = tonumber(v)
-  if n and n >= 100 then
-    cfg.farmY = math.clamp(math.floor(n), 100, 15000)
-  end end
+  Callback = function(v) local n = tonumber(v)
+    if n and n >= 100 then
+      cfg.farmY = math.clamp(math.floor(n), 100, 15000)
+    end end })
 
 -- живое обновление языка без перезапуска
 pcall(function()
