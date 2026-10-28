@@ -5,7 +5,7 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
-local cfg = { bhop = false, hopMode = "OnlyGround", speedMult = 1.0, botCham = false, plrCham = false,
+local cfg = { bhop = true, hopMode = "OnlyGround", speedMult = 1.19, botCham = false, plrCham = false,
   helpCham = false, farmExp = false, farmY = 12000, shield = false, autoRevive = false }
 local farmCX, farmCZ, savedGrav = nil, nil, nil
 local FARM_X, FARM_Z = 21753, 8094
@@ -85,7 +85,7 @@ local function clearChams()
     if d.Name == "EVADEcham" or d.Name == "EVADEchamH" then pcall(function() d:Destroy() end) end
   end
 end
-local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Value = false,
+local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Value = true,
   Callback = function(v) cfg.bhop = v end })
 local hopDrop = Tabs.Main:Dropdown({
   Title = LT("Режим бхопа", "Bhop mode"), Description = LT("OnlyGround = прыжок при приземлении, Any = всегда", "OnlyGround = jump on landing, Any = always"),
@@ -94,7 +94,7 @@ local hopDrop = Tabs.Main:Dropdown({
 local speedDrop = Tabs.Main:Dropdown({
   Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.05", "x1.10", "x1.11", "x1.14", "x1.18", "x1.19+" },
-  Value = "x1.0",
+  Value = "x1.19+",
   Callback = function(v) if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
   else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end end })
 local botTog = Tabs.Main:Toggle({ Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Value = false,
