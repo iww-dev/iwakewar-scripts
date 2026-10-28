@@ -1,1 +1,0 @@
-local z = game.Workspace:FindFirstChild("Really redZone") z.VoteLaunchRE:FireServer() task.wait(2) local lr = z:FindFirstChild("LaunchRequirments") local p = lr and lr:FindFirstChild("Pressed") return { pressed = p and p.Value, launched = z.Launched.Value }

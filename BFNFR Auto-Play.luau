@@ -28,48 +28,41 @@ if genv0.__bfnfrFluent and type(genv0.__bfnfrFluent.Destroy) == "function" then
   pcall(function() genv0.__bfnfrFluent:Destroy() end)
 end
 -- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
-local function loadGUI()
-  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  local src = game:HttpGet(url, true)
-  if not src or #src < 1000 then
-    error("iwakewar-gui source could not be loaded")
-  end
-  return (loadstring(src))()
-end
-
-local GUI = loadGUI()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local GUI = WindUI
 genv0.__bfnfrFluent = GUI
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 -- язык: saved or ru default, живьём через OnLangChanged
-local function getLang()
-  local g = getgenv and getgenv() or {}
-  return (g.__iwkLang == "en") and "en" or "ru"
+local lang = "ru"
+local function getLang() return lang end
+local function LT(ru, uk, en)
+  if lang == "en" then return en or ru end
+  if lang == "uk" then return uk or ru end
+  return ru
 end
-pcall(function() GUI:SetLang(getLang()) end)
-local function LT(ru, en)
-  return (getLang() == "en") and en or ru
-end
-local Window = GUI:CreateWindow({
+local Window = WindUI:CreateWindow({
     Title = "BFNFR Auto-Play",
-    SubTitle = "by iwakewar team",
-    TabWidth = 150,
-    Size = UDim2.fromOffset(640, 460),
-    ToggleKey = Enum.KeyCode.RightAlt,
+    Folder = "iwakewar-bfnfr",
+    Icon = "music",
+    Theme = "Rose",
+    Size = UDim2.fromOffset(780, 500),
+    Topbar = { Height = 40, ButtonsType = "Default" },
+    OpenButton = { Enabled = true, Draggable = true, OnlyMobile = true, Scale = 1.1, CornerRadius = UDim.new(0, 6) },
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau"
 local Tabs = {
-    Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
-    Main = Window:AddTab({ Title = LT("Управление", "Controls"), Icon = "gamepad-2" }),
-    Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
+    Info = Window:Tab({ Title = LT("Инфо", "Інфо", "Info"), Icon = "sfsymbols:info.circle", Border = true }),
+    Main = Window:Tab({ Title = LT("Управление", "Керування", "Controls"), Icon = "sfsymbols:gamecontroller", Border = true }),
+    Settings = Window:Tab({ Title = LT("Настройки", "Налаштування", "Settings"), Icon = "sfsymbols:gear", Border = true }),
 }
 local Options = GUI.Options
-Window:SelectTab(1)
+pcall(function() Window:SelectTab(1) end)
 
 -- Settings: пока только язык, по умолчанию русский
-local langDrop = Tabs.Settings:AddDropdown("Lang", {
+local langDrop = Tabs.Settings:Dropdown({
   Title = "Language / Язык",
-  Values = { "Русский", "English" },
-  Default = (getLang() == "en") and "English" or "Русский",
+  Values = { "Русский", "Українська", "English" },
+  Value = "Русский",
   Callback = function(v)
     pcall(function()
       local g = getgenv and getgenv() or {}
@@ -205,7 +198,47 @@ local function fetchSettings(): boolean
     return true
 end
 
+local cachedPrompts = nil
 local function detectSide(): number?
+    local ch = plr.Character
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        if not cachedPrompts then
+            cachedPrompts = {}
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then
+                    local part = d.Parent
+                    if part and part:IsA("BasePart") then
+                        table.insert(cachedPrompts, part.Position)
+                    end
+                end
+            end
+        end
+        if cachedPrompts and #cachedPrompts >= 2 then
+            local nearest, nd = nil, math.huge
+            for _, pos in ipairs(cachedPrompts) do
+                local dist = (pos - hrp.Position).Magnitude
+                if dist < nd then nearest, nd = pos, dist end
+            end
+            local sumX = 0
+            for _, pos in ipairs(cachedPrompts) do sumX = sumX + pos.X end
+            local avgX = sumX / #cachedPrompts
+            if nearest then
+                print("detectSide: prompts=" .. #cachedPrompts .. " nearestX=" .. nearest.X .. " avgX=" .. avgX .. " hrpX=" .. hrp.Position.X)
+                return (nearest.X < avgX) and 1 or 2
+            end
+        end
+        -- fallback: attribute on MatchFrame
+        local sideAttr = mf:GetAttribute("Side")
+        if sideAttr == 1 or sideAttr == 2 then return sideAttr end
+        local sideVal = plr:FindFirstChild("Side") or (plr:FindFirstChild("leaderstats") and plr.leaderstats:FindFirstChild("Side"))
+        if sideVal and tonumber(sideVal.Value) then
+            local v = tonumber(sideVal.Value)
+            if v == 1 or v == 2 then return v end
+        end
+        if hrp.Position.X > 0 then return 2 end
+        return 1
+    end
     for s = 1, 2 do
         local ks = mf:FindFirstChild("KeySync" .. s)
         if ks then
@@ -330,27 +363,27 @@ local function rerollTargets()
 end
 
 -- GUI elements
-local MainSection = Tabs.Main:AddSection("Main Functions")
+local MainSection = Tabs.Main:Section({ Title = LT("Основные функции", "Основні функції", "Main Functions") })
 
-local Status = Tabs.Main:AddParagraph({
+local Status = Tabs.Main:Paragraph({
     Title = LT("Статус", "Status"),
     Content = LT("Ожидание — жду трек…", "Idle — waiting for a track…"),
 })
-local Live = Tabs.Main:AddParagraph({
+local Live = Tabs.Main:Paragraph({
     Title = LT("Лайв", "Live"),
     Content = LT("состояние: ВЫКЛ • сторона: - • скорость: - • хиты: 0", "state: OFF • side: - • speed: - • hits: 0"),
 })
 
 local function notify(title: string, content: string, duration: number)
     if noNotifications then return end
-    GUI:Notify({
+    WindUI:Notify({
         Title = title,
         Content = content,
         Duration = duration,
     })
 end
 
-local enabledTog = MainSection:AddToggle("Enabled", {
+local enabledTog = Tabs.Main:Toggle({
     Title = LT("Авто-игра", "Auto-Play"),
     Description = LT("Автонажатия клавиш", "Toggle automatic key presses"),
     Default = false,
@@ -363,7 +396,7 @@ local enabledTog = MainSection:AddToggle("Enabled", {
     end,
 })
 
-local antiAfkTog = MainSection:AddToggle("AntiAfk", {
+local antiAfkTog = Tabs.Main:Toggle({
     Title = LT("Анти-АФК", "Anti-AFK"),
     Description = LT("Прыжок каждые 10с в треке", "Jump every 10s while in a track"),
     Default = true,
@@ -372,7 +405,7 @@ local antiAfkTog = MainSection:AddToggle("AntiAfk", {
     end,
 })
 
-local noNotifTog2 = MainSection:AddToggle("NoNotifications", {
+local noNotifTog2 = Tabs.Main:Toggle({
     Title = LT("Без уведомлений", "Do not send notifications"),
     Description = LT("Скрыть все уведомления", "Hide all notifications"),
     Default = false,
@@ -381,7 +414,7 @@ local noNotifTog2 = MainSection:AddToggle("NoNotifications", {
     end,
 })
 
-local perfectDrop = MainSection:AddDropdown("PerfectMode", {
+local perfectDrop = Tabs.Main:Dropdown({
     Title = LT("Режим Perfect", "Perfect mode"),
     Description = LT("Никогда Perfect, микс 57/43 или всегда", "Never Perfect, mixed 57/43, or always Perfect"),
     Values = {
@@ -389,7 +422,7 @@ local perfectDrop = MainSection:AddDropdown("PerfectMode", {
         "Mix (57% Perfect)",
         "Always Perfect",
     },
-    Default = "Mix (57% Perfect)",
+    Value = "Mix (57% Perfect)",
     Callback = function(value)
         if value == "Never Perfect" then
             perfectChance = 0
@@ -402,22 +435,22 @@ local perfectDrop = MainSection:AddDropdown("PerfectMode", {
     end,
 })
 
-local togKey2 = MainSection:AddKeybind("ToggleKey", {
+local togKey2 = Tabs.Main:Keybind({
     Title = LT("Клавиша-тогл", "Toggle keybind"),
     Description = LT("Быстро вкл/выкл авто-игру", "Quickly turn Auto-Play on/off"),
     Mode = "Toggle",
     Default = "H",
     Callback = function()
-        Options.Enabled:SetValue(not Options.Enabled.Value)
+        enabledTog:SetValue(not enabled)
     end,
 })
 
-local bfnfrInfo = Tabs.Info:AddParagraph({
+local bfnfrInfo = Tabs.Info:Paragraph({
     Title = "BFNFR Auto-Play",
     Content = LT("Премиум авто-игра для Basically FNF: Remix\nby iwakewar team\n\n- Играет твою линию твоими биндами\n- Полные анимации Hit/Release (реальные нажатия)\n- Холды держит и отпускает корректно\n- Дропдаун Perfect: Never / Mix 57%/43% / Always\n- Самокалибровка тайминга (сохраняется)\n- Встроенный анти-АФК\n\nЖми H (или свой бинд) для тогла.", "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Perfect mode dropdown: Never / Mix 57%/43% / Always\n- Self-calibrating timing (persists between sessions)\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle."),
 })
 
-local discordBtn = Tabs.Info:AddButton({
+local discordBtn = Tabs.Info:Button({
     Title = LT("Наш Discord сервер", "Our Discord Server"),
     Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
     Callback = function()
@@ -610,6 +643,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 notify("BFNFR Auto-Play", "Loaded. Toggle with H.", 4)
+pcall(function() Window:SetToggleKey(Enum.KeyCode.LeftAlt) end)
 
 -- live note scroll-rate measurement: derive the game's real NoteSpeed
 -- (the server value always clamps to 0.8, which is wrong for most songs).
