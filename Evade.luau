@@ -15,54 +15,47 @@ if genv0.__evadeFluent and type(genv0.__evadeFluent.Destroy) == "function" then
   pcall(function() genv0.__evadeFluent:Destroy() end)
 end
 -- GUI loader: всегда с гитхаба, локальный кэш не юзаем (чтобы не залипать на старой версии)
-local function loadGUI()
-  local url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/iwakewar-gui.luau"
-  local src = game:HttpGet(url, true)
-  if not src or #src < 1000 then
-    error("iwakewar-gui source could not be loaded")
-  end
-  return (loadstring(src))()
-end
-local GUI = loadGUI()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local GUI = WindUI
 genv0.__evadeFluent = GUI
 -- язык: saved or ru default, живьём через OnLangChanged
-local function getLang()
-  local g = getgenv and getgenv() or {}
-  return (g.__iwkLang == "en") and "en" or "ru"
+local lang = "ru"
+local function getLang() return lang end
+local function LT(ru, uk, en)
+  if lang == "en" then return en or ru end
+  if lang == "uk" then return uk or ru end
+  return ru
 end
-pcall(function() GUI:SetLang(getLang()) end)
-local function LT(ru, en)
-  return (getLang() == "en") and en or ru
-end
-local Window = GUI:CreateWindow({
+local Window = WindUI:CreateWindow({
   Title = "Evade Helper",
-  SubTitle = "by iwakewar team",
-  TabWidth = 150,
-  Size = UDim2.fromOffset(640, 460),
-  ToggleKey = Enum.KeyCode.RightAlt,
+  Folder = "iwakewar-evade",
+  Icon = "zap",
+  Theme = "Rose",
+  Size = UDim2.fromOffset(780, 500),
+  Topbar = { Height = 40, ButtonsType = "Default" },
+  OpenButton = { Enabled = true, Draggable = true, OnlyMobile = true, Scale = 1.1, CornerRadius = UDim.new(0, 6) },
 })
 GUI._selfUrl = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Evade.luau"
 local Tabs = {
-  Info = Window:AddTab({ Title = LT("Инфо", "Info"), Icon = "badge-check" }),
-  Main = Window:AddTab({ Title = LT("Главная", "Main"), Icon = "" }),
-  Settings = Window:AddTab({ Title = LT("Настройки", "Settings"), Icon = "settings" }),
+  Info = Window:Tab({ Title = LT("Инфо", "Інфо", "Info"), Icon = "sfsymbols:info.circle", Border = true }),
+  Main = Window:Tab({ Title = LT("Главная", "Головна", "Main"), Icon = "sfsymbols:house", Border = true }),
+  Settings = Window:Tab({ Title = LT("Настройки", "Налаштування", "Settings"), Icon = "sfsymbols:gear", Border = true }),
 }
-Window:SelectTab(1)
+pcall(function() Window:SelectTab(1) end)
 
 -- Settings: пока только язык, по умолчанию русский
-local langDrop = Tabs.Settings:AddDropdown("Lang", {
-  Title = "Language / Язык",
-  Values = { "Русский", "English" },
-  Default = (getLang() == "en") and "English" or "Русский",
+Tabs.Settings:Dropdown({
+  Title = "Language / Язык / Мова",
+  Values = { "Русский", "Українська", "English" },
+  Value = "Русский",
   Callback = function(v)
-    pcall(function()
-      local g = getgenv and getgenv() or {}
-      g.__iwkLang = (v == "English") and "en" or "ru"
-      GUI:SetLang(g.__iwkLang)
-    end)
+    if v == "English" then lang = "en"
+    elseif v == "Українська" then lang = "uk"
+    else lang = "ru" end
+    WindUI:Notify({ Title = "Evade Helper", Content = "Language changed", Duration = 2 })
   end,
 })
-local infoPara = Tabs.Info:AddParagraph({
+local infoPara = Tabs.Info:Paragraph({
   Title = "Evade Helper",
   Content = LT(
     "Хелпер для Evade\nby iwakewar team\n\n- Баннихоп (WASD + Space, прыжок каждые 0.082с)\n- Спидхак дропдаун\n- Чамсы ботов / игроков / нуждающихся\n- Автофарм EXP (якорь на Y900, боты не достают)",
@@ -76,13 +69,13 @@ local function copyToClipboard(text)
   end
   return false
 end
-local discordBtn = Tabs.Info:AddButton({
+local discordBtn = Tabs.Info:Button({
   Title = LT("Наш Discord сервер", "Our Discord Server"),
   Description = LT("Скопировать ссылку-приглашение", "Copy invite link to clipboard"),
   Callback = function()
     local ok = copyToClipboard("https://discord.gg/GgshjzxxFS")
     local _en = (getLang() == "en")
-    GUI:Notify({ Title = "Evade Helper", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
+    WindUI:Notify({ Title = "Evade Helper", Content = ok and (_en and "Discord link copied" or "Ссылка скопирована") or (_en and "No clipboard API" or "Нет доступа к буферу"), Duration = 3 })
   end,
 })
 -- mobile floating toggle is built into iwakewar-gui, nothing to do here
@@ -92,33 +85,31 @@ local function clearChams()
     if d.Name == "EVADEcham" or d.Name == "EVADEchamH" then pcall(function() d:Destroy() end) end
   end
 end
-local bhopTog = Tabs.Main:AddToggle("BhopTog", { Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Default = false })
-bhopTog:OnChanged(function() cfg.bhop = bhopTog.Value end)
-local hopDrop = Tabs.Main:AddDropdown("HopDrop", {
+local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), Description = LT("Спам прыжков в движении (0.082с)", "Jump spam while moving (0.082s)"), Value = false })
+bhopTog.Callback = function(v) cfg.bhop = v end
+local hopDrop = Tabs.Main:Dropdown({
   Title = LT("Режим бхопа", "Bhop mode"), Description = LT("OnlyGround = прыжок при приземлении, Any = всегда", "OnlyGround = jump on landing, Any = always"),
-  Values = { "OnlyGround", "Any" }, Multi = false, Default = 1,
+  Values = { "OnlyGround", "Any" }, Multi = false, Value = 1,
 })
-hopDrop:OnChanged(function(v) cfg.hopMode = v end)
-local speedDrop = Tabs.Main:AddDropdown("SpeedDrop", {
+hopDrop.Callback = function(v) cfg.hopMode = v end
+local speedDrop = Tabs.Main:Dropdown({
   Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.05", "x1.10", "x1.11", "x1.14", "x1.18", "x1.19+" },
-  Multi = false, Default = 1,
+  Multi = false, Value = 1,
 })
-speedDrop:OnChanged(function(v)
-  if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
-  else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end
-end)
-local botTog = Tabs.Main:AddToggle("BotCham", { Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Default = false })
-botTog:OnChanged(function() cfg.botCham = botTog.Value clearChams() end)
-local plrTog = Tabs.Main:AddToggle("PlrCham", { Title = LT("Чамсы игроков", "Player's Chams"), Description = LT("Подсветка игроков синим", "Highlight players blue"), Default = false })
-plrTog:OnChanged(function() cfg.plrCham = plrTog.Value clearChams() end)
-local helpTog = Tabs.Main:AddToggle("HelpCham", { Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = LT("Подсветка упавших зелёным", "Highlight downed players green"), Default = false })
-helpTog:OnChanged(function() cfg.helpCham = helpTog.Value clearChams() end)
-local shieldTog = Tabs.Main:AddToggle("ShieldTog", { Title = LT("Щит от ботов", "Bot Shield"), Description = LT("Пузырь коллизии вокруг ботов", "Collision bubble around bots"), Default = false })
-shieldTog:OnChanged(function() cfg.shield = shieldTog.Value end)
-local farmTog = Tabs.Main:AddToggle("FarmTog", { Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = LT("Якорь на высоте фарма, боты не достают", "Anchor at farm Y, zero gravity/velocity, bots can't reach"), Default = false })
-farmTog:OnChanged(function()
-  cfg.farmExp = farmTog.Value
+speedDrop.Callback = function(v) if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
+  else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end end
+local botTog = Tabs.Main:Toggle({ Title = LT("Чамсы ботов", "Bots Chams"), Description = LT("Подсветка ботов красным", "Highlight nextbots red"), Value = false })
+botTog.Callback = function(v) cfg.botCham = v clearChams() end
+local plrTog = Tabs.Main:Toggle({ Title = LT("Чамсы игроков", "Player's Chams"), Description = LT("Подсветка игроков синим", "Highlight players blue"), Value = false })
+plrTog.Callback = function(v) cfg.plrCham = v clearChams() end
+local helpTog = Tabs.Main:Toggle({ Title = LT("Чамсы упавших", "NeedHelpPlayers Chams"), Description = LT("Подсветка упавших зелёным", "Highlight downed players green"), Value = false })
+helpTog.Callback = function(v) cfg.helpCham = v clearChams() end
+local shieldTog = Tabs.Main:Toggle({ Title = LT("Щит от ботов", "Bot Shield"), Description = LT("Пузырь коллизии вокруг ботов", "Collision bubble around bots"), Value = false })
+shieldTog.Callback = function(v) cfg.shield = v end
+local farmTog = Tabs.Main:Toggle({ Title = LT("Автофарм EXP", "Auto Farm EXP"), Description = LT("Якорь на высоте фарма, боты не достают", "Anchor at farm Y, zero gravity/velocity, bots can't reach"), Value = false })
+farmTog.Callback = function(v)
+  cfg.farmExp = v
   local ch = LP.Character
   local me = ch and ch:FindFirstChild("HumanoidRootPart")
   if cfg.farmExp then
@@ -126,20 +117,21 @@ farmTog:OnChanged(function()
     if savedGrav == nil then savedGrav = workspace.Gravity end
     pcall(function() workspace.Gravity = 0 end)
   else
-    if savedGrav ~= nil then pcall(function() workspace.Gravity = savedGrav end) savedGrav = nil end
+    if savedGrav ~= nil then
+      pcall(function() workspace.Gravity = savedGrav end)
+      savedGrav = nil
+    end
     if me then pcall(function() me.Anchored = false end) end
   end
-end)
-local farmYDrop = Tabs.Main:AddDropdown("FarmYDrop", {
+end
+local farmYDrop = Tabs.Main:Dropdown({
   Title = LT("Высота фарма", "Farm height"), Description = LT("Высота зависания (боты на земле)", "Y to hang at (bots stay on ground)"),
-  Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Multi = false, Default = 7,
+  Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Multi = false, Value = "12000",
 })
-farmYDrop:OnChanged(function(v)
-  local n = tonumber(v)
+farmYDrop.Callback = function(v) local n = tonumber(v)
   if n and n >= 100 then
     cfg.farmY = math.clamp(math.floor(n), 100, 15000)
-  end
-end)
+  end end
 
 -- живое обновление языка без перезапуска
 pcall(function()
@@ -403,6 +395,7 @@ end)
 
 task.spawn(function()
   print("[EVADE] ready")
+pcall(function() Window:SetToggleKey(Enum.KeyCode.LeftAlt) end)
   local revBusy = false
   local function downedList()
     local out = {}
