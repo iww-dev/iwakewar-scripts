@@ -89,13 +89,13 @@ local bhopTog = Tabs.Main:Toggle({ Title = LT("Баннихоп", "BunnyHop"), D
 bhopTog.Callback = function(v) cfg.bhop = v end
 local hopDrop = Tabs.Main:Dropdown({
   Title = LT("Режим бхопа", "Bhop mode"), Description = LT("OnlyGround = прыжок при приземлении, Any = всегда", "OnlyGround = jump on landing, Any = always"),
-  Values = { "OnlyGround", "Any" }, Multi = false, Value = "OnlyGround",
+  Values = { "OnlyGround", "Any" }, Value = "OnlyGround",
 })
 hopDrop.Callback = function(v) cfg.hopMode = v end
 local speedDrop = Tabs.Main:Dropdown({
   Title = LT("Спидхак", "Speedhack"), Description = LT("Множитель WalkSpeed", "WalkSpeed multiplier"),
   Values = { "x1.0", "x1.05", "x1.10", "x1.11", "x1.14", "x1.18", "x1.19+" },
-  Multi = false, Value = "x1.0",
+  Value = "x1.0",
 })
 speedDrop.Callback = function(v) if v:sub(-1) == "+" then cfg.speedMult = tonumber(v:sub(2, -2)) or 1.0
   else cfg.speedMult = tonumber(v:sub(2)) or 1.0 end end
@@ -126,7 +126,7 @@ farmTog.Callback = function(v)
 end
 local farmYDrop = Tabs.Main:Dropdown({
   Title = LT("Высота фарма", "Farm height"), Description = LT("Высота зависания (боты на земле)", "Y to hang at (bots stay on ground)"),
-  Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Multi = false, Value = "12000",
+  Values = { "300", "500", "900", "1500", "2000", "7000", "12000" }, Value = "12000",
 })
 farmYDrop.Callback = function(v) local n = tonumber(v)
   if n and n >= 100 then
