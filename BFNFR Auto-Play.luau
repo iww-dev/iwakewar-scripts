@@ -133,9 +133,15 @@ local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
 
 local PERFECT_CENTER = 11
 local SICK_CENTER = 31
--- 57% Perfect / 43% Sick — ровно как написано в дропдауне
-local MIX_PERFECT_CHANCE = 57
-local perfectChance = MIX_PERFECT_CHANCE
+-- Mix: доля Perfect случайная в диапазоне 56-64% (перебрасывается на каждую песню)
+local MIX_PERFECT_MIN = 56
+local MIX_PERFECT_MAX = 64
+local perfectMode = "mix"
+local perfectChance = MIX_PERFECT_MIN + math.random() * (MIX_PERFECT_MAX - MIX_PERFECT_MIN)
+
+local function rollMixChance()
+    perfectChance = MIX_PERFECT_MIN + math.random() * (MIX_PERFECT_MAX - MIX_PERFECT_MIN)
+end
 
 -- === Humanizer / Accuracy ===
 -- Игра считает точность за ноту непрерывно от |off|: acc(off) ~= 1 - (off/130.5)^2
@@ -247,6 +253,8 @@ local function beginHumanizer()
     accBaseAcc = plr:GetAttribute("Acc")
     accBaseW = plr:GetAttribute("AccWeight")
     lastRunAcc = nil
+    -- Mix: своя случайная доля Perfect на каждую песню (56-64%)
+    if perfectMode == "mix" then rollMixChance() end
     applyHumanizerMode()
 end
 
@@ -507,20 +515,23 @@ Tabs.Main:Section({ Title = "Humanizer" })
 
 local perfectDrop = Tabs.Main:Dropdown({
     Title = "Perfect mode",
-    Description = "Never ~91-96% / Mix 57/43 / Always ~99.88%",
+    Description = "Never ~91-96% / Mix 56-64% / Always ~99.88%",
     Values = {
         "Never Perfect",
-        "Mix (57% Perfect)",
+        "Mix (56-64% Perfect)",
         "Always Perfect",
     },
-    Value = "Mix (57% Perfect)",
+    Value = "Mix (56-64% Perfect)",
     Callback = function(value)
         if value == "Never Perfect" then
+            perfectMode = "never"
             perfectChance = 0
         elseif value == "Always Perfect" then
+            perfectMode = "always"
             perfectChance = 100
         else
-            perfectChance = MIX_PERFECT_CHANCE
+            perfectMode = "mix"
+            rollMixChance()
         end
         applyHumanizerMode()
         rerollTargets()
@@ -559,7 +570,7 @@ local togKey2 = Tabs.Main:Keybind({
 
 local bfnfrInfo = Tabs.Info:Paragraph({
     Title = "BFNFR Auto-Play",
-    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Accuracy modes: Never ~91-96%, Mix 57/43, Always ~99.88%\n- Side: auto from the game (File.CurrentPlayer) + manual override\n- msIndic auto-enabled, no timing drift\n- Anti-AFK built in\n\nPress RightShift to open / close the menu.",
+    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Accuracy modes: Never ~91-96%, Mix 56-64%, Always ~99.88%\n- Side: auto from the game (File.CurrentPlayer) + manual override\n- msIndic auto-enabled, no timing drift\n- Anti-AFK built in\n\nPress RightShift to open / close the menu.",
 })
 
 local discordBtn = Tabs.Info:Button({
