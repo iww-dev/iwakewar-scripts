@@ -601,17 +601,22 @@ local function buildPrimordialSplash()
         lastError = full
         warn("[iwakewar-scripts] " .. full)
         pcall(function() L:Fail(full:sub(1, 160)) end)
+        pcall(function() L:ShowClose() end)
     end
     ui.ok = function(msg: string)
         pcall(function() L:Done(msg or "Loaded") end)
     end
-    ui.showClose = function() end
+    ui.showClose = function()
+        pcall(function() L:ShowClose() end)
+    end
     ui.close = function()
         pcall(function() L:Destroy() end)
     end
     ui.didFail = function(): boolean return failed end
     ui.getError = function(): string? return lastError end
     ui.loader = L
+    -- страховка от зависшего HttpGet: лоадер не может висеть вечно
+    pcall(function() L:SetTimeout(25) end)
     return ui
 end
 

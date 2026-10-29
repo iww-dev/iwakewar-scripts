@@ -2090,6 +2090,46 @@ function Lib:Loader(cfg)
     }
     local closed = false
 
+    -- Рисованный крестик: в JosefinSans нет глифа ✕, а рамка на его месте
+    -- выглядит как битый символ, поэтому рисуем двумя повёрнутыми полосками.
+    local function makeCloseIcon(host, color)
+        local parts = {}
+        for _, rot in ipairs({ 45, -45 }) do
+            parts[#parts + 1] = new("Frame", {
+                BackgroundColor3 = color,
+                BorderSizePixel = 0,
+                Size = UDim2.fromOffset(9, 1.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Rotation = rot,
+                ZIndex = 7,
+            }, host)
+        end
+        return parts
+    end
+
+    local closeBtn = button(win, {
+        Name = "Close",
+        BackgroundColor3 = P.element,
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(22, 22),
+        Position = UDim2.new(1, -30, 0, 12),
+        ZIndex = 6,
+    })
+    corner(closeBtn, 3)
+    local closeIcon = makeCloseIcon(closeBtn, P.dim)
+    local function tintClose(color)
+        for _, bar in ipairs(closeIcon) do bar.BackgroundColor3 = color end
+    end
+    closeBtn.MouseEnter:Connect(function()
+        tintClose(P.danger)
+        closeBtn.BackgroundTransparency = 0.82
+    end)
+    closeBtn.MouseLeave:Connect(function()
+        tintClose(P.dim)
+        closeBtn.BackgroundTransparency = 1
+    end)
+
     function L:SetStatus(v)
         if closed then return end
         statusLbl.TextColor3 = P.sub
@@ -2141,6 +2181,29 @@ function Lib:Loader(cfg)
         closed = true
         pcall(function() gui:Destroy() end)
         if Lib.__loader == L then Lib.__loader = nil end
+    end
+
+    closeBtn.MouseButton1Click:Connect(function() L:Destroy() end)
+
+    -- Сколько лоадер живёт максимум. Если за это время никто не вызвал
+    -- :Done()/:Destroy(), он покажет ошибку и сам уйдёт с экрана, чтобы
+    -- не остаться вечной картинкой поверх игры.
+    local watchdog = nil
+    function L:SetTimeout(sec)
+        if watchdog then pcall(task.cancel, watchdog) end
+        watchdog = task.delay(tonumber(sec) or 20, function()
+            if closed then return end
+            L:Fail("Timed out")
+            task.delay(2.5, function() L:Destroy() end)
+        end)
+    end
+
+    -- Подсветить кнопку закрытия (кнопка и так есть; метод для интеграций,
+    -- которые раньше звали ui.showClose()).
+    function L:ShowClose()
+        if closed then return end
+        tintClose(P.danger)
+        tween(closeBtn, 0.15, { BackgroundTransparency = 0.82 })
     end
 
     Lib.__loader = L
