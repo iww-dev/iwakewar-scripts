@@ -560,7 +560,7 @@ local function buildPrimordialSplash()
     local ok, L = pcall(function()
         return UI:Loader({
             Title = "iwakewar-scripts",
-            Subtitle = "loader v3.1",
+            Subtitle = "v3.1",
             Status = "Booting...",
             Console = true,
             Width = 470,

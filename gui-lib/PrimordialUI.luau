@@ -1,7 +1,9 @@
 --[[
-    PrimordialUI — flat dark hub UI for Roblox executors.
-    Style: left category sidebar, top sub-tab strip, flat cards with header
-    strips and compact rows. No external dependencies.
+    PrimordialUI 1.1 — flat dark hub UI for Roblox executors.
+    Style: left category sidebar, top sub-tab strip, cards with header strips,
+    compact rows, soft shadows, gradients and glassy dropdowns.
+    Sibling of "Primordial Loader" (Lib:Loader) — the same visual system for
+    splash screens. No external dependencies.
 
     Usage:
         local UI = loadstring(game:HttpGet(".../gui-lib/PrimordialUI.luau"))()
@@ -44,6 +46,28 @@ local P = {
     knob = Color3.fromRGB(238, 238, 244),
     danger = Color3.fromRGB(214, 94, 103),
     checkMark = Color3.fromRGB(26, 18, 22),
+
+    -- градиентные пары (верх/низ) для объёма: окно, карточки, элементы.
+    -- Всё в тех же тёмных оттенках, чтобы не выбиваться из палитры.
+    bgTop = Color3.fromRGB(25, 25, 28),
+    bgBottom = Color3.fromRGB(14, 14, 16),
+    chromeTop = Color3.fromRGB(19, 19, 22),
+    chromeBottom = Color3.fromRGB(11, 11, 13),
+    sidebarTop = Color3.fromRGB(17, 17, 20),
+    sidebarBottom = Color3.fromRGB(12, 12, 14),
+    cardTop = Color3.fromRGB(38, 38, 44),
+    cardBottom = Color3.fromRGB(28, 28, 32),
+    cardHoverTop = Color3.fromRGB(45, 45, 52),
+    cardHoverBottom = Color3.fromRGB(34, 34, 39),
+    headTop = Color3.fromRGB(51, 51, 58),
+    headBottom = Color3.fromRGB(39, 39, 45),
+    elemTop = Color3.fromRGB(57, 57, 65),
+    elemBottom = Color3.fromRGB(43, 43, 50),
+    elemHoverTop = Color3.fromRGB(68, 68, 78),
+    elemHoverBottom = Color3.fromRGB(53, 53, 61),
+    accentTop = Color3.fromRGB(233, 157, 192),
+    accentBottom = Color3.fromRGB(188, 105, 145),
+    rim = Color3.fromRGB(255, 255, 255),
 }
 
 local FONT_FAMILY = "rbxasset://fonts/families/JosefinSans.json"
@@ -170,6 +194,128 @@ local function tween(o, time, props)
     TweenService:Create(o, TweenInfo.new(time or 0.12, Enum.EasingStyle.Quad), props):Play()
 end
 
+-- ======================================================================
+-- gradients / depth helpers
+-- ======================================================================
+local function colorSeq(list)
+    local kps = {}
+    for _, k in ipairs(list) do
+        kps[#kps + 1] = ColorSequenceKeypoint.new(k[1], k[2])
+    end
+    return ColorSequence.new(kps)
+end
+
+local function numberSeq(list)
+    local kps = {}
+    for _, k in ipairs(list) do
+        kps[#kps + 1] = NumberSequenceKeypoint.new(k[1], k[2])
+    end
+    return NumberSequence.new(kps)
+end
+
+-- вертикальный градиент (сверху -> снизу): основной приём объёма
+local function vgrad(o, top, bottom, trans)
+    local g = Instance.new("UIGradient")
+    g.Rotation = 90
+    g.Color = colorSeq({ { 0, top }, { 1, bottom } })
+    if trans then g.Transparency = trans end
+    g.Parent = o
+    return g
+end
+
+-- горизонтальный градиент (слева -> справа)
+local function hgrad(o, left, right, trans)
+    local g = Instance.new("UIGradient")
+    g.Rotation = 0
+    g.Color = colorSeq({ { 0, left }, { 1, right } })
+    if trans then g.Transparency = trans end
+    g.Parent = o
+    return g
+end
+
+-- градиентная обводка: верх светлее, низ темнее (мягкий объём вместо плоской рамки)
+local function strokeGrad(st, top, bottom, transSeq)
+    if not st then return nil end
+    local g = Instance.new("UIGradient")
+    g.Rotation = 90
+    g.Color = colorSeq({ { 0, top }, { 1, bottom } })
+    if transSeq then g.Transparency = transSeq end
+    g.Parent = st
+    return g
+end
+
+-- тонкая световая линия по верхней кромке: "стеклянный" блик
+local function rimLight(o, inset, transparency, thickness, radius)
+    local r = new("Frame", {
+        BackgroundColor3 = P.rim,
+        BorderSizePixel = 0,
+        BackgroundTransparency = transparency or 0.93,
+        Size = UDim2.new(1, -2 * (inset or 1), 0, thickness or 1),
+        Position = UDim2.fromOffset(inset or 1, 1),
+        ZIndex = 0,
+    }, o)
+    corner(r, radius or 1)
+    hgrad(r, Color3.new(1, 1, 1), Color3.new(1, 1, 1), numberSeq({
+        { 0, 1 },
+        { 0.12, math.clamp((transparency or 0.93) - 0.06, 0, 1) },
+        { 0.5, math.clamp((transparency or 0.93) - 0.1, 0, 1) },
+        { 0.88, math.clamp((transparency or 0.93) - 0.06, 0, 1) },
+        { 1, 1 },
+    }))
+    return r
+end
+
+-- мягкая тень вокруг произвольного элемента: несколько слоёв, растущих наружу.
+-- host — контейнер, в котором лежит тень; target — сам элемент.
+local function softShadow(host, target, opts)
+    opts = opts or {}
+    local layers = opts.Layers or 4
+    local spread = opts.Spread or 8
+    local base = opts.Alpha or 0.55
+    local yOff = opts.Y or 3
+    local color = opts.Color or Color3.new(0, 0, 0)
+    local radius = opts.Radius or 6
+    local z = opts.ZIndex or 0
+    local frames = {}
+
+    for i = 1, layers do
+        local f = new("Frame", {
+            BackgroundColor3 = color,
+            BackgroundTransparency = math.clamp(base + (i - 1) * (0.24 / math.max(1, layers - 1)), 0, 1),
+            BorderSizePixel = 0,
+            ZIndex = z,
+            Visible = false,
+        }, host)
+        corner(f, radius + i)
+        frames[i] = f
+    end
+
+    local function sync()
+        local ok = pcall(function()
+            local tx, ty = target.AbsolutePosition.X, target.AbsolutePosition.Y
+            local tw, th = target.AbsoluteSize.X, target.AbsoluteSize.Y
+            local hx, hy = host.AbsolutePosition.X, host.AbsolutePosition.Y
+            local visible = target.Visible and tw > 0
+            for i, f in ipairs(frames) do
+                local grow = (spread / layers) * i
+                f.Position = UDim2.fromOffset(tx - hx - grow, ty - hy - grow + yOff)
+                f.Size = UDim2.fromOffset(tw + grow * 2, th + grow * 2)
+                f.Visible = visible
+            end
+        end)
+        return ok
+    end
+
+    sync()
+    task.defer(sync)
+    pcall(function()
+        target:GetPropertyChangedSignal("AbsolutePosition"):Connect(sync)
+        target:GetPropertyChangedSignal("AbsoluteSize"):Connect(sync)
+        target:GetPropertyChangedSignal("Visible"):Connect(sync)
+    end)
+    return sync, frames
+end
+
 local function measureHeight(str, width, size)
     if not str or str == "" then return 12 end
     local ok, res = pcall(function()
@@ -186,7 +332,9 @@ local Lib = {}
 Lib.__index = Lib
 Lib.Unloaded = false
 Lib.Options = {}
-Lib.Version = "1.0.0"
+Lib.Version = "1.1.0"
+Lib.Brand = "Primordial UI"
+Lib.LoaderBrand = "Primordial Loader"
 Lib.Lang = "ru"
 Lib.Palette = P
 Lib.__loader = nil
@@ -275,44 +423,28 @@ function Lib:CreateWindow(cfg)
         ZIndex = 2,
     }, gui)
     corner(root, 6)
-    stroke(root, P.stroke, 1, 0.1)
-    W.Frame = root
-
+    vgrad(root, P.bgTop, P.bgBottom)
+    local rootStroke = stroke(root, P.stroke, 1, 0.1)
+    strokeGrad(rootStroke,
+        Color3.fromRGB(86, 86, 98),
+        Color3.fromRGB(30, 30, 35),
+        numberSeq({ { 0, 0.1 }, { 0.55, 0.35 }, { 1, 0.62 } }))
     -- мягкая тень вокруг окна: несколько полупрозрачных слоёв
-    local shadowHost = new("Frame", {
-        Name = "Shadow",
-        BackgroundTransparency = 1,
-        Size = UDim2.fromScale(1, 1),
-        ZIndex = 1,
-    }, gui)
-    local shadows = {}
-    for i = 1, 9 do
-        local sh = new("Frame", {
-            BackgroundColor3 = Color3.new(0, 0, 0),
-            BackgroundTransparency = 0.62 + i * 0.035,
-            BorderSizePixel = 0,
-            ZIndex = 1,
-        }, shadowHost)
-        corner(sh, 8 + i * 2)
-        shadows[i] = sh
-    end
-    local function syncShadow()
-        for i, sh in ipairs(shadows) do
-            sh.Size = UDim2.new(
-                root.Size.X.Scale, root.Size.X.Offset + i * 5,
-                root.Size.Y.Scale, root.Size.Y.Offset + i * 3.5
-            )
-            sh.Position = UDim2.new(
-                root.Position.X.Scale, root.Position.X.Offset - i * 2.5,
-                root.Position.Y.Scale, root.Position.Y.Offset - i * 1.75 + 3
-            )
-        end
-        shadowHost.Visible = root.Visible
-    end
-    syncShadow()
-    root:GetPropertyChangedSignal("Size"):Connect(syncShadow)
-    root:GetPropertyChangedSignal("Position"):Connect(syncShadow)
-    root:GetPropertyChangedSignal("Visible"):Connect(syncShadow)
+    softShadow(gui, root, { Layers = 7, Spread = 22, Alpha = 0.5, Y = 5, Radius = 7, ZIndex = 1 })
+    W.Frame = root
+    -- верхний блик по кромке окна
+    local rootRim = new("Frame", {
+        BackgroundColor3 = P.rim,
+        BackgroundTransparency = 0.92,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, -2, 0, 1),
+        Position = UDim2.fromOffset(1, 1),
+        ZIndex = 3,
+    }, root)
+    corner(rootRim, 1)
+    hgrad(rootRim, Color3.new(1, 1, 1), Color3.new(1, 1, 1), numberSeq({
+        { 0, 1 }, { 0.1, 0.9 }, { 0.5, 0.84 }, { 0.9, 0.9 }, { 1, 1 },
+    }))
 
     -- top bar -----------------------------------------------------------
     local top = new("Frame", {
@@ -323,6 +455,19 @@ function Lib:CreateWindow(cfg)
         ClipsDescendants = true,
     }, root)
     corner(top, 6)
+    vgrad(top, P.chromeTop, P.chromeBottom)
+    rimLight(top, 1, 0.94, 1, 3)
+    -- акцентное свечение под логотипом: очень слабое, только чтобы верх "жил"
+    local topGlow = new("Frame", {
+        BackgroundColor3 = P.accent,
+        BackgroundTransparency = 0.94,
+        BorderSizePixel = 0,
+        Size = UDim2.fromOffset(150, 42),
+        Position = UDim2.fromOffset(-24, 0),
+    }, top)
+    hgrad(topGlow, P.accent, P.accent, numberSeq({
+        { 0, 0.84 }, { 0.45, 0.94 }, { 1, 1 },
+    }))
 
     local logoWrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(230, 42) }, top)
     local markHolder = new("Frame", {
@@ -346,12 +491,15 @@ function Lib:CreateWindow(cfg)
     })
     grad.Parent = titleLbl
 
-    new("Frame", {
+    local topLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 1),
         Position = UDim2.new(0, 0, 1, -1),
     }, top)
+    hgrad(topLine, P.stroke, P.stroke, numberSeq({
+        { 0, 0.35 }, { 0.2, 0 }, { 0.8, 0 }, { 1, 0.5 },
+    }))
 
     local function topBtn(xOffset, color, onClick)
         local b = button(top, {
@@ -460,26 +608,42 @@ function Lib:CreateWindow(cfg)
     }, root)
     W.Body = body
 
+    local topShade = new("Frame", {
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, 10),
+        ZIndex = 5,
+    }, body)
+    vgrad(topShade, Color3.new(0, 0, 0), Color3.new(0, 0, 0), numberSeq({
+        { 0, 0.7 }, { 1, 1 },
+    }))
+
     local sidebar = new("Frame", {
         Name = "Sidebar",
         BackgroundColor3 = P.chrome,
         BorderSizePixel = 0,
         Size = UDim2.new(0, 196, 1, 0),
+        ClipsDescendants = true,
     }, body)
+    vgrad(sidebar, P.sidebarTop, P.sidebarBottom)
     local sbPad = Instance.new("UIPadding")
     sbPad.PaddingTop = UDim.new(0, 8)
     sbPad.PaddingBottom = UDim.new(0, 8)
     sbPad.Parent = sidebar
     listLayout(sidebar, 2)
 
-    -- разделитель сайдбара: от низа топбара и до самого низа окна
-    new("Frame", {
+    -- разделитель сайдбара: от низа топбара и до самого низа окна.
+    -- Градиент по вертикали, чтобы линия растворялась к краям окна.
+    local sbLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
         Size = UDim2.new(0, 1, 1, -42),
         Position = UDim2.new(0, 196, 0, 42),
         ZIndex = 10,
     }, root)
+    vgrad(sbLine, P.stroke, P.stroke, numberSeq({
+        { 0, 0.25 }, { 0.25, 0 }, { 0.75, 0 }, { 1, 0.4 },
+    }))
 
     -- footer ------------------------------------------------------------
     local footer = new("Frame", {
@@ -489,11 +653,15 @@ function Lib:CreateWindow(cfg)
         Size = UDim2.new(1, 0, 0, 32),
         Position = UDim2.new(0, 0, 1, -32),
     }, root)
-    new("Frame", {
+    vgrad(footer, P.chromeBottom, P.chromeTop)
+    local footLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 1),
     }, footer)
+    hgrad(footLine, P.stroke, P.stroke, numberSeq({
+        { 0, 0.5 }, { 0.25, 0 }, { 0.75, 0 }, { 1, 0.5 },
+    }))
     -- футер: текст слева, версия акцентом и чуть жирнее, с отдельным отступом
     local footerRow = new("Frame", {
         BackgroundTransparency = 1,
@@ -571,7 +739,11 @@ function Lib:CreateWindow(cfg)
             LayoutOrder = notifyOrder,
         }, notifyHolder)
         corner(card, 4)
+        vgrad(card, P.cardTop, P.cardBottom)
+        rimLight(card, 1, 0.95, 1, 3)
         local st = stroke(card, P.stroke, 1, 1)
+        strokeGrad(st, Color3.fromRGB(92, 92, 105), Color3.fromRGB(30, 30, 35),
+            numberSeq({ { 0, 1 }, { 1, 1 } }))
         -- отступы прямо на карточке: AutomaticSize учитывает UIPadding,
         -- поэтому высота всегда совпадает с текстом
         padAll(card, 16, 9, 14, 9)
@@ -587,12 +759,25 @@ function Lib:CreateWindow(cfg)
             BackgroundColor3 = opts.Accent or P.accent,
             BorderSizePixel = 0,
             Size = UDim2.new(0, 2, 0, 0),
-            Position = UDim2.fromOffset(-15, 8),
+            Position = UDim2.fromOffset(0, 8),
             BackgroundTransparency = 1,
+            ZIndex = 2,
         }, card)
         corner(bar, 1)
+        vgrad(bar, opts.Accent or P.accentTop, opts.Accent or P.accentBottom)
+        local barGlow = new("Frame", {
+            BackgroundColor3 = opts.Accent or P.accent,
+            BorderSizePixel = 0,
+            Size = UDim2.new(0, 6, 0, 0),
+            Position = UDim2.fromOffset(-2, 6),
+            BackgroundTransparency = 1,
+            ZIndex = 1,
+        }, card)
+        corner(barGlow, 3)
         local function syncBar()
-            bar.Size = UDim2.new(0, 2, 0, math.max(0, inner.AbsoluteSize.Y - 16))
+            local h = math.max(0, inner.AbsoluteSize.Y - 16)
+            bar.Size = UDim2.new(0, 2, 0, h)
+            barGlow.Size = UDim2.new(0, 6, 0, h + 4)
         end
         syncBar()
         inner:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncBar)
@@ -617,6 +802,7 @@ function Lib:CreateWindow(cfg)
         tween(card, 0.16, { BackgroundTransparency = 0 })
         tween(st, 0.16, { Transparency = 0.25 })
         tween(bar, 0.16, { BackgroundTransparency = 0 })
+        tween(barGlow, 0.16, { BackgroundTransparency = 0.86 })
         tween(t1, 0.16, { TextTransparency = 0 })
         tween(c1, 0.16, { TextTransparency = 0 })
         task.delay(hold, function()
@@ -624,6 +810,7 @@ function Lib:CreateWindow(cfg)
             tween(card, 0.22, { BackgroundTransparency = 1 })
             tween(st, 0.22, { Transparency = 1 })
             tween(bar, 0.22, { BackgroundTransparency = 1 })
+            tween(barGlow, 0.22, { BackgroundTransparency = 1 })
             tween(t1, 0.22, { TextTransparency = 1 })
             tween(c1, 0.22, { TextTransparency = 1 })
             task.wait(0.25)
@@ -635,11 +822,21 @@ function Lib:CreateWindow(cfg)
     -- popup ---------------------------------------------------------------
     local openPopup = nil
     local openPopupAnchor = nil
+    local openPopupShadow = nil
+
+    local function clearPopupShadow()
+        if not openPopupShadow then return end
+        for _, f in ipairs(openPopupShadow) do
+            pcall(function() f:Destroy() end)
+        end
+        openPopupShadow = nil
+    end
 
     local function closePopup(instant)
         local pop = openPopup
         openPopup = nil
         openPopupAnchor = nil
+        clearPopupShadow()
         if not pop then return end
         if instant then
             pcall(function() pop:Destroy() end)
@@ -669,6 +866,7 @@ function Lib:CreateWindow(cfg)
         local popH = #items * 26 + math.max(0, #items - 1) + 8
         local pop = new("Frame", {
             BackgroundColor3 = P.card,
+            BackgroundTransparency = 0.03,
             BorderSizePixel = 0,
             Size = UDim2.fromOffset(popW, 0),
             Position = UDim2.fromOffset(
@@ -679,34 +877,57 @@ function Lib:CreateWindow(cfg)
             ClipsDescendants = true,
         }, root)
         corner(pop, 4)
-        stroke(pop, P.stroke, 1, 0)
+        vgrad(pop, Color3.fromRGB(46, 46, 53), Color3.fromRGB(33, 33, 38))
+        local popStroke = stroke(pop, P.stroke, 1, 0.05)
+        strokeGrad(popStroke,
+            Color3.fromRGB(105, 105, 120),
+            Color3.fromRGB(34, 34, 39),
+            numberSeq({ { 0, 0.05 }, { 0.6, 0.35 }, { 1, 0.62 } }))
+        rimLight(pop, 1, 0.93, 1, 3)
         padAll(pop, 4, 4, 4, 4)
         listLayout(pop, 1)
         openPopup = pop
         openPopupAnchor = anchor
+        local _, shFrames = softShadow(root, pop, {
+            Layers = 6, Spread = 18, Alpha = 0.34, Y = 6, Radius = 5, ZIndex = 39,
+        })
+        openPopupShadow = shFrames
 
         for i, item in ipairs(items) do
+            local isCur = (item == current)
             local row = button(pop, {
                 Text = tostring(item),
                 TextSize = 13,
                 Size = UDim2.new(1, 0, 0, 26),
-                BackgroundColor3 = (item == current) and P.element or P.card,
-                BackgroundTransparency = (item == current) and 0 or 1,
-                TextColor3 = (item == current) and P.text or P.sub,
+                BackgroundColor3 = (isCur and P.element or P.card),
+                BackgroundTransparency = (isCur and 0 or 1),
+                TextColor3 = (isCur and P.text or P.sub),
                 LayoutOrder = i,
                 ZIndex = 41,
             })
-            padAll(row, 8, 0, 8, 0)
             corner(row, 3)
+            padAll(row, 8, 0, 8, 0)
+            if isCur then
+                local curBar = new("Frame", {
+                    BackgroundColor3 = P.accent,
+                    BackgroundTransparency = 0,
+                    BorderSizePixel = 0,
+                    Size = UDim2.new(0, 2, 1, -8),
+                    Position = UDim2.new(0, 0, 0, 4),
+                    ZIndex = 42,
+                }, row)
+                corner(curBar, 1)
+                vgrad(curBar, P.accentTop, P.accentBottom)
+            end
             row.MouseEnter:Connect(function()
                 row.BackgroundTransparency = 0
                 row.BackgroundColor3 = P.elementHover
                 row.TextColor3 = P.text
             end)
             row.MouseLeave:Connect(function()
-                row.BackgroundColor3 = (item == current) and P.element or P.card
-                row.BackgroundTransparency = (item == current) and 0 or 1
-                row.TextColor3 = (item == current) and P.text or P.sub
+                row.BackgroundColor3 = (isCur and P.element or P.card)
+                row.BackgroundTransparency = (isCur and 0 or 1)
+                row.TextColor3 = (isCur and P.text or P.sub)
             end)
             row.MouseButton1Click:Connect(function()
                 closePopup()
@@ -736,7 +957,13 @@ function Lib:CreateWindow(cfg)
         end
         local card = new(class, props, parent)
         corner(card, 4)
-        stroke(card, P.stroke, 1, 0.45)
+        vgrad(card, P.cardTop, P.cardBottom)
+        local cardStroke = stroke(card, P.stroke, 1, 0.45)
+        strokeGrad(cardStroke,
+            Color3.fromRGB(78, 78, 90),
+            Color3.fromRGB(32, 32, 37),
+            numberSeq({ { 0, 0.35 }, { 0.5, 0.55 }, { 1, 0.7 } }))
+        rimLight(card, 1, 0.955, 1, 3)
         listLayout(card, 0)
 
         local head = new("Frame", {
@@ -746,6 +973,19 @@ function Lib:CreateWindow(cfg)
             Visible = titleStr ~= nil and titleStr ~= "",
         }, card)
         corner(head, 4)
+        vgrad(head, P.headTop, P.headBottom)
+        rimLight(head, 1, 0.94, 1, 3)
+        -- тень под шапкой: шапка "приподнята" над телом карточки
+        local headShade = new("Frame", {
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.55,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, 0, 0, 1),
+            Position = UDim2.new(0, 0, 1, 0),
+        }, head)
+        hgrad(headShade, Color3.new(0, 0, 0), Color3.new(0, 0, 0), numberSeq({
+            { 0, 0.35 }, { 0.5, 0.55 }, { 1, 0.35 },
+        }))
         padAll(head, 10, 0, 8, 0)
         local headLabel = text(head, {
             Text = titleStr or "",
@@ -767,6 +1007,8 @@ function Lib:CreateWindow(cfg)
 
     local function setCardHover(card, on)
         tween(card, 0.1, { BackgroundColor3 = on and P.cardHover or P.card })
+        local st = card:FindFirstChildOfClass("UIStroke")
+        if st then tween(st, 0.12, { Transparency = on and 0.2 or 0.45 }) end
     end
 
     -- row = description on the left, control on the right
@@ -803,14 +1045,46 @@ function Lib:CreateWindow(cfg)
     end
 
     local function makeCheckbox(parent, isOn, onChange)
+        -- тень под чекбоксом + мягкое свечение, когда он включён
+        local halo = new("Frame", {
+            BackgroundColor3 = P.accent,
+            BackgroundTransparency = isOn and 0.86 or 1,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(27, 27),
+            Position = UDim2.fromOffset(-5, -2),
+            ZIndex = 0,
+        }, parent)
+        corner(halo, 7)
+        local drop = new("Frame", {
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.62,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(17, 17),
+            Position = UDim2.fromOffset(0, 4),
+            ZIndex = 0,
+        }, parent)
+        corner(drop, 3)
+
         local box = new("Frame", {
             BackgroundColor3 = isOn and P.accent or P.element,
             BorderSizePixel = 0,
             Size = UDim2.fromOffset(17, 17),
             Position = UDim2.fromOffset(0, 3),
+            ZIndex = 2,
         }, parent)
         corner(box, 3)
-        stroke(box, isOn and P.accent or P.stroke, 1, 0)
+        local boxGrad = vgrad(box, P.accentTop, P.accentBottom)
+        boxGrad.Enabled = isOn == true
+        local innerTop = new("Frame", {
+            BackgroundColor3 = P.rim,
+            BackgroundTransparency = 0.75,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, -2, 0, 1),
+            Position = UDim2.fromOffset(1, 1),
+            ZIndex = 3,
+        }, box)
+        hgrad(innerTop, P.rim, P.rim, numberSeq({ { 0, 1 }, { 0.5, 0.75 }, { 1, 1 } }))
+        local boxStroke = stroke(box, isOn and P.accent or P.stroke, 1, 0)
         local check = text(box, {
             Text = "\u{2713}",
             TextSize = 14,
@@ -818,20 +1092,26 @@ function Lib:CreateWindow(cfg)
             TextXAlignment = Enum.TextXAlignment.Center,
             Size = UDim2.fromScale(1, 1),
             TextTransparency = isOn and 0 or 1,
+            ZIndex = 4,
         }, W_BOLD)
         local hit = button(parent, {
             Size = UDim2.fromOffset(17, 17),
             Position = UDim2.fromOffset(0, 3),
             BackgroundTransparency = 1,
+            ZIndex = 5,
         })
         local state = isOn == true
         local api = {}
         function api:SetValue(v)
             state = v and true or false
-            tween(box, 0.12, { BackgroundColor3 = state and P.accent or P.element })
-            tween(check, 0.12, { TextTransparency = state and 0 or 1 })
-            local st = box:FindFirstChildOfClass("UIStroke")
-            if st then tween(st, 0.12, { Color = state and P.accent or P.stroke }) end
+            tween(box, 0.14, { BackgroundColor3 = state and P.accent or P.element })
+            boxGrad.Enabled = state
+            tween(innerTop, 0.14, { BackgroundTransparency = state and 0.75 or 0.94 })
+            tween(check, 0.14, { TextTransparency = state and 0 or 1 })
+            tween(halo, 0.2, { BackgroundTransparency = state and 0.86 or 1 })
+            tween(drop, 0.14, { BackgroundTransparency = state and 0.5 or 0.62 })
+            local st = boxStroke
+            if st then tween(st, 0.14, { Color = state and P.accent or P.stroke }) end
         end
         function api:GetValue()
             return state
@@ -861,25 +1141,52 @@ function Lib:CreateWindow(cfg)
             Position = UDim2.new(0, 6, 0.5, -2),
         }, holder)
         corner(track, 2)
+        vgrad(track, Color3.fromRGB(33, 33, 38), Color3.fromRGB(62, 62, 71))
         local fill = new("Frame", {
             BackgroundColor3 = P.accent,
             BorderSizePixel = 0,
             Size = UDim2.new(0, 0, 1, 0),
+            ZIndex = 2,
         }, track)
         corner(fill, 2)
+        hgrad(fill, P.accentTop, P.accentBottom)
+        local fillShine = new("Frame", {
+            BackgroundColor3 = P.rim,
+            BackgroundTransparency = 0.8,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, 0, 0, 1),
+            Position = UDim2.fromOffset(0, 1),
+            ZIndex = 3,
+        }, fill)
+        local halo = new("Frame", {
+            BackgroundColor3 = P.accent,
+            BackgroundTransparency = 0.84,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(20, 20),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0, 0.5),
+            ZIndex = 1,
+        }, track)
+        corner(halo, 10)
         local knob = new("Frame", {
             BackgroundColor3 = P.knob,
             BorderSizePixel = 0,
             Size = UDim2.fromOffset(10, 10),
             AnchorPoint = Vector2.new(0.5, 0.5),
             Position = UDim2.fromScale(0, 0.5),
+            ZIndex = 4,
         }, track)
         corner(knob, 5)
+        vgrad(knob, Color3.fromRGB(255, 255, 255), Color3.fromRGB(205, 205, 214))
+        stroke(knob, Color3.fromRGB(120, 120, 132), 1, 0.55)
 
         local function redraw()
             local n = math.clamp((value - min) / math.max(1e-6, max - min), 0, 1)
             fill.Size = UDim2.new(n, 0, 1, 0)
+            fillShine.Visible = n > 0.02
             knob.Position = UDim2.fromScale(n, 0.5)
+            halo.Position = UDim2.fromScale(n, 0.5)
+            halo.BackgroundTransparency = 0.84
         end
         redraw()
 
@@ -926,6 +1233,15 @@ function Lib:CreateWindow(cfg)
             other.Page.Visible = active
             tween(other.BtnBg, 0.12, { BackgroundTransparency = active and 0 or 1 })
             tween(other.Bar, 0.12, { BackgroundTransparency = active and 0 or 1 })
+            if other.BtnStroke then
+                tween(other.BtnStroke, 0.12, { Transparency = active and 0.35 or 1 })
+            end
+            if other.BarGlow then
+                tween(other.BarGlow, 0.16, { BackgroundTransparency = active and 0.82 or 1 })
+            end
+            if other.ActiveTint then
+                tween(other.ActiveTint, 0.16, { BackgroundTransparency = active and 0.9 or 1 })
+            end
             other.NameLabel.TextColor3 = active and P.text or P.sub
             other.DescLabel.TextColor3 = active and P.sub or P.dim
             applyFont(other.NameLabel, active and W_MED or W_REG)
@@ -951,6 +1267,29 @@ function Lib:CreateWindow(cfg)
             LayoutOrder = #W.Tabs + 1,
         }, sidebar)
         corner(btnBg, 3)
+        vgrad(btnBg, P.elemTop, P.elemBottom)
+        local btnStroke = stroke(btnBg, P.stroke, 1, 1)
+        local activeTint = new("Frame", {
+            BackgroundColor3 = P.accent,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Size = UDim2.fromScale(1, 1),
+            ZIndex = 0,
+        }, btnBg)
+        corner(activeTint, 3)
+        hgrad(activeTint, P.accent, P.accent, numberSeq({
+            { 0, 0.8 }, { 0.55, 0.92 }, { 1, 1 },
+        }))
+
+        local barGlow = new("Frame", {
+            BackgroundColor3 = P.accent,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Size = UDim2.new(0, 7, 0, 30),
+            Position = UDim2.new(0, 2, 0.5, -15),
+            ZIndex = 1,
+        }, btnBg)
+        corner(barGlow, 4)
 
         local bar = new("Frame", {
             BackgroundColor3 = P.accent,
@@ -958,8 +1297,10 @@ function Lib:CreateWindow(cfg)
             BorderSizePixel = 0,
             Size = UDim2.new(0, 2, 0, 26),
             Position = UDim2.new(0, 4, 0.5, -13),
+            ZIndex = 2,
         }, btnBg)
         corner(bar, 2)
+        vgrad(bar, P.accentTop, P.accentBottom)
 
         local nameLabel = text(btnBg, {
             Text = tab.Title,
@@ -988,6 +1329,7 @@ function Lib:CreateWindow(cfg)
         end)
 
         tab.BtnBg, tab.Bar, tab.NameLabel, tab.DescLabel = btnBg, bar, nameLabel, descLabel
+        tab.BtnStroke, tab.ActiveTint, tab.BarGlow = btnStroke, activeTint, barGlow
         tab.btn = setmetatable({ Text = tab.Title }, {
             __index = function(_, k)
                 if k == "Text" then return nameLabel.Text end
@@ -1015,20 +1357,24 @@ function Lib:CreateWindow(cfg)
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 0, 34),
         }, page)
-        listLayout(strip, 0, Enum.FillDirection.Horizontal)
+        local stripLayout = listLayout(strip, 0, Enum.FillDirection.Horizontal)
+        stripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
         local stripPad = Instance.new("UIPadding")
         stripPad.PaddingLeft = UDim.new(0, 6)
         stripPad.PaddingRight = UDim.new(0, 14)
         stripPad.Parent = strip
         -- линия-разделитель живёт в page, а не в strip: иначе она участвует
         -- в горизонтальном UIListLayout и выдавливает чипсы за экран
-        new("Frame", {
+        local stripLine = new("Frame", {
             BackgroundColor3 = P.stroke,
             BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 1),
             Position = UDim2.new(0, 0, 0, 33),
             ZIndex = 2,
         }, page)
+        hgrad(stripLine, P.stroke, P.stroke, numberSeq({
+            { 0, 0.35 }, { 0.12, 0 }, { 0.9, 0 }, { 1, 0.25 },
+        }))
 
         local scroll = new("ScrollingFrame", {
             BackgroundTransparency = 1,
@@ -1079,34 +1425,71 @@ function Lib:CreateWindow(cfg)
                 Text = sectionEntry.Title,
                 TextSize = 14,
                 TextColor3 = P.sub,
+                BackgroundColor3 = P.element,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(0, 0, 1, -1),
                 AutomaticSize = Enum.AutomaticSize.X,
                 TextXAlignment = Enum.TextXAlignment.Center,
-                LayoutOrder = #tab.Sections,
+                LayoutOrder = #tab.Sections * 2,
+                ZIndex = 2,
             }, W_MED)
             padAll(chip, 16, 0, 16, 0)
+            corner(chip, 3)
+            local chipGlow = new("Frame", {
+                BackgroundColor3 = P.accent,
+                BorderSizePixel = 0,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, -14, 0, 7),
+                Position = UDim2.new(0, 7, 1, -5),
+                ZIndex = 1,
+            }, chip)
+            corner(chipGlow, 3)
+            hgrad(chipGlow, P.accent, P.accent, numberSeq({
+                { 0, 1 }, { 0.5, 0.86 }, { 1, 1 },
+            }))
             local chipLine = new("Frame", {
                 BackgroundColor3 = P.accent,
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, -18, 0, 2),
                 Position = UDim2.new(0, 9, 1, -3),
+                ZIndex = 3,
             }, chip)
             corner(chipLine, 1)
+            hgrad(chipLine, P.accentTop, P.accentBottom)
 
-            chip.MouseEnter:Connect(function() chip.TextColor3 = P.text end)
+            -- тонкий разделитель между чипсами, как в оригинальном primordial
+            if #tab.Sections > 1 then
+                local sep = new("Frame", {
+                    BackgroundColor3 = P.stroke,
+                    BorderSizePixel = 0,
+                    BackgroundTransparency = 0.45,
+                    Size = UDim2.new(0, 1, 0, 16),
+                    LayoutOrder = #tab.Sections * 2 - 1,
+                }, strip)
+                vgrad(sep, P.stroke, P.stroke, numberSeq({
+                    { 0, 1 }, { 0.25, 0.3 }, { 0.75, 0.3 }, { 1, 1 },
+                }))
+            end
+
+            chip.MouseEnter:Connect(function()
+                chip.TextColor3 = P.text
+                tween(chip, 0.12, { BackgroundTransparency = 0.9 })
+            end)
             chip.MouseLeave:Connect(function()
                 chip.TextColor3 = (tab.SelectedSection == sectionEntry) and P.text or P.sub
+                tween(chip, 0.12, { BackgroundTransparency = 1 })
             end)
             chip.MouseButton1Click:Connect(function()
                 tab:_selectSection(sectionEntry)
             end)
             sectionEntry.Chip = chip
             sectionEntry.ChipLine = chipLine
+            sectionEntry.ChipGlow = chipGlow
             if tab.SelectedSection == sectionEntry then
                 chip.TextColor3 = P.text
                 chipLine.BackgroundTransparency = 0
+                chipGlow.BackgroundTransparency = 0.85
             end
         end
 
@@ -1117,6 +1500,7 @@ function Lib:CreateWindow(cfg)
                 if s.Container then s.Container.Visible = active end
                 if s.Chip then s.Chip.TextColor3 = active and P.text or P.sub end
                 if s.ChipLine then s.ChipLine.BackgroundTransparency = active and 0 or 1 end
+                if s.ChipGlow then s.ChipGlow.BackgroundTransparency = active and 0.85 or 1 end
             end
             tab.SelectedSection = sectionEntry
             pcall(function()
@@ -1256,8 +1640,20 @@ function Lib:CreateWindow(cfg)
         local box = button(holder, {
             BackgroundColor3 = P.element,
             Size = UDim2.fromOffset(150, 24),
+            ZIndex = 2,
         })
         corner(box, 3)
+        vgrad(box, P.elemTop, P.elemBottom)
+        local boxStroke = stroke(box, P.stroke, 1, 0.4)
+        local boxShadow = new("Frame", {
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.7,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(150, 24),
+            Position = UDim2.fromOffset(0, 1),
+            ZIndex = 0,
+        }, holder)
+        corner(boxShadow, 3)
         padAll(box, 9, 0, 22, 0)
         local valueLbl = text(box, {
             Text = tostring(api.Value),
@@ -1265,15 +1661,23 @@ function Lib:CreateWindow(cfg)
             Size = UDim2.new(1, 0, 1, 0),
             TextTruncate = Enum.TextTruncate.AtEnd,
         })
-        text(box, {
+        local chev = text(box, {
             Text = "v",
             TextSize = 11,
             TextColor3 = P.sub,
             TextXAlignment = Enum.TextXAlignment.Right,
             Size = UDim2.new(1, -9, 1, -1),
         }, W_SEMI)
-        box.MouseEnter:Connect(function() tween(box, 0.1, { BackgroundColor3 = P.elementHover }) end)
-        box.MouseLeave:Connect(function() tween(box, 0.1, { BackgroundColor3 = P.element }) end)
+        box.MouseEnter:Connect(function()
+            tween(box, 0.1, { BackgroundColor3 = P.elementHover })
+            tween(boxStroke, 0.1, { Color = P.dim, Transparency = 0.15 })
+            chev.TextColor3 = P.text
+        end)
+        box.MouseLeave:Connect(function()
+            tween(box, 0.1, { BackgroundColor3 = P.element })
+            tween(boxStroke, 0.1, { Color = P.stroke, Transparency = 0.4 })
+            chev.TextColor3 = P.sub
+        end)
         box.MouseButton1Click:Connect(function()
             if isPopupFor(box) then
                 closePopup()
@@ -1310,8 +1714,19 @@ function Lib:CreateWindow(cfg)
         local card, _, headLabel, bodyBox = makeCard(sectionParent(self), opts.Title or "")
         local _, holder, descLabel = makeRow(bodyBox, opts.Description, 104, 200)
 
-        local box = button(holder, { BackgroundColor3 = P.element, Size = UDim2.fromOffset(104, 24) })
+        local box = button(holder, { BackgroundColor3 = P.element, Size = UDim2.fromOffset(104, 24), ZIndex = 2 })
         corner(box, 3)
+        vgrad(box, P.elemTop, P.elemBottom)
+        local kbStroke = stroke(box, P.stroke, 1, 0.4)
+        local kbShadow = new("Frame", {
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.7,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(104, 24),
+            Position = UDim2.fromOffset(0, 1),
+            ZIndex = 0,
+        }, holder)
+        corner(kbShadow, 3)
         local boxLabel = text(box, {
             Text = keyName(),
             TextSize = 14,
@@ -1319,6 +1734,14 @@ function Lib:CreateWindow(cfg)
             TextXAlignment = Enum.TextXAlignment.Center,
             Size = UDim2.fromScale(1, 1),
         })
+        box.MouseEnter:Connect(function()
+            tween(box, 0.1, { BackgroundColor3 = P.elementHover })
+            tween(kbStroke, 0.1, { Transparency = 0.15, Color = P.dim })
+        end)
+        box.MouseLeave:Connect(function()
+            tween(box, 0.1, { BackgroundColor3 = P.element })
+            tween(kbStroke, 0.1, { Transparency = 0.4, Color = P.stroke })
+        end)
 
         local listening = false
         local conn
@@ -1404,7 +1827,7 @@ function Lib:CreateWindow(cfg)
             Size = UDim2.new(1, -18, 0, 20),
             TextTruncate = Enum.TextTruncate.AtEnd,
         }, W_MED)
-        text(row, {
+        local arrowLbl = text(row, {
             Text = "\u{203A}",
             TextSize = 16,
             TextColor3 = P.sub,
@@ -1424,8 +1847,14 @@ function Lib:CreateWindow(cfg)
             })
         end
 
-        card.MouseEnter:Connect(function() setCardHover(card, true) end)
-        card.MouseLeave:Connect(function() setCardHover(card, false) end)
+        card.MouseEnter:Connect(function()
+            setCardHover(card, true)
+            arrowLbl.TextColor3 = P.accent
+        end)
+        card.MouseLeave:Connect(function()
+            setCardHover(card, false)
+            arrowLbl.TextColor3 = P.sub
+        end)
         card.MouseButton1Click:Connect(function()
             if opts.Callback then task.spawn(opts.Callback) end
         end)
@@ -1537,7 +1966,14 @@ function Lib:Loader(cfg)
         AnchorPoint = Vector2.new(0.5, 0.5),
     }, gui)
     corner(win, 6)
-    stroke(win, P.stroke, 1, 0.05)
+    vgrad(win, P.bgTop, P.bgBottom)
+    local winStroke = stroke(win, P.stroke, 1, 0.05)
+    strokeGrad(winStroke,
+        Color3.fromRGB(86, 86, 98),
+        Color3.fromRGB(30, 30, 35),
+        numberSeq({ { 0, 0.08 }, { 1, 0.6 } }))
+    softShadow(gui, win, { Layers = 6, Spread = 20, Alpha = 0.45, Y = 5, Radius = 7 })
+    rimLight(win, 1, 0.92, 1, 3)
 
     local markHolder = new("Frame", {
         BackgroundTransparency = 1,
@@ -1546,22 +1982,27 @@ function Lib:Loader(cfg)
     }, win)
     drawLogoMark(markHolder, 13, P.accent)
 
+    -- бренд лоадера: отдельное имя "Primordial Loader" в экосистеме Primordial
     local title = text(win, {
-        Text = cfg.Title or "iwakewar-scripts",
+        Text = string.format('<font color="#E9E9EE">%s</font> <font color="#%s">%s</font>',
+            tostring(cfg.Brand or "Primordial"),
+            string.format("%02X%02X%02X",
+                math.floor(P.accent.R * 255 + 0.5),
+                math.floor(P.accent.G * 255 + 0.5),
+                math.floor(P.accent.B * 255 + 0.5)),
+            tostring(cfg.BrandSuffix or "Loader")),
+        RichText = true,
         TextSize = 20,
         Position = UDim2.fromOffset(45, 12),
         Size = UDim2.new(1, -66, 0, 28),
         TextTruncate = Enum.TextTruncate.AtEnd,
     }, W_SEMI)
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(240, 240, 244)),
-        ColorSequenceKeypoint.new(1, P.accent),
-    })
-    grad.Parent = title
 
+    local subParts = {}
+    if cfg.Title and cfg.Title ~= "" then subParts[#subParts + 1] = tostring(cfg.Title) end
+    if cfg.Subtitle and cfg.Subtitle ~= "" then subParts[#subParts + 1] = tostring(cfg.Subtitle) end
     text(win, {
-        Text = cfg.Subtitle or "loader",
+        Text = #subParts > 0 and table.concat(subParts, "  ·  ") or "loader",
         TextSize = 12,
         TextColor3 = P.dim,
         Position = UDim2.fromOffset(46, 37),
@@ -1593,12 +2034,22 @@ function Lib:Loader(cfg)
         Position = UDim2.fromOffset(18, 96),
     }, win)
     corner(track, 2)
+    vgrad(track, Color3.fromRGB(30, 30, 35), Color3.fromRGB(62, 62, 71))
     local fill = new("Frame", {
         BackgroundColor3 = P.accent,
         BorderSizePixel = 0,
         Size = UDim2.new(0, 0, 1, 0),
+        ClipsDescendants = true,
     }, track)
     corner(fill, 2)
+    hgrad(fill, P.accentTop, P.accentBottom)
+    local fillShine = new("Frame", {
+        BackgroundColor3 = P.rim,
+        BackgroundTransparency = 0.72,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, 1),
+        Position = UDim2.fromOffset(0, 1),
+    }, fill)
 
     local logScroll, logCount = nil, 0
     if hasConsole then
@@ -1610,7 +2061,11 @@ function Lib:Loader(cfg)
             ClipsDescendants = true,
         }, win)
         corner(box, 4)
-        stroke(box, P.stroke, 1, 0.5)
+        vgrad(box, Color3.fromRGB(15, 15, 18), Color3.fromRGB(10, 10, 12))
+        local logStroke = stroke(box, P.stroke, 1, 0.5)
+        strokeGrad(logStroke, Color3.fromRGB(58, 58, 68), Color3.fromRGB(24, 24, 28),
+            numberSeq({ { 0, 0.45 }, { 1, 0.7 } }))
+        rimLight(box, 1, 0.96, 1, 3)
         padAll(box, 10, 8, 10, 8)
         logScroll = new("ScrollingFrame", {
             BackgroundTransparency = 1,

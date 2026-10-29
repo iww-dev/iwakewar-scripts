@@ -35,6 +35,28 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 либа молча падает на Gotham. Глифы `✓ ✕ – › • — →` в нём есть, поэтому
 крестик/галочку/стрелку рисуем символами, а логотип — фреймом (ромб).
 
+## Визуал (1.1)
+
+Объём как в оригинальном primordial: никаких плоских заливок.
+
+- у окна, лоадера и дропдауна — многослойная мягкая тень (`softShadow`), которая
+  пересчитывается по `AbsolutePosition`/`AbsoluteSize`, так что тень ездит вместе
+  с элементом и не ломает `UIListLayout`;
+- у окна, топбара, сайдбара, футера, карточек, шапок, кнопок и лоадера —
+  вертикальные градиенты (`vgrad`, пара «светлый верх → тёмный низ»);
+- по верхней кромке — световой блик `rimLight`, по нижней — тень под шапкой;
+- обводки градиентные (`strokeGrad`): сверху светлее, снизу темнее;
+- дропдаун полупрозрачный (`BackgroundTransparency = 0.03`) + градиент, поэтому
+  он читается как «стекло» над содержимым;
+- чекбокс: градиентная заливка, блик, тень под квадратом и розовое свечение,
+  когда включён; ползунок: градиентный трек, градиентная заливка, блик и
+  ореол вокруг кнопки;
+- активная вкладка сайдбара — градиентная подложка + светящаяся акцентная
+  полоска; активный чипс — градиентное подчёркивание с мягким свечением.
+
+Настоящего blur на отдельный элемент в Roblox нет (`BlurEffect` блюрит весь
+экран), поэтому «стекло» собрано из прозрачности, градиента и тени.
+
 ## API
 
 | Метод | Что делает |
@@ -54,12 +76,15 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 | `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()` |
 | `UI:OnLangChanged(fn)` / `UI:SetLang(l)` | подписка на смену языка |
 
-## Loader mode
+## Loader mode — «Primordial Loader»
 
-Для `main.luau` и любого лоадстринга — отдельный сплэш без окна и табов:
+Отдельный бренд экосистемы: окно лоадера всегда подписано **Primordial Loader**
+(белое `Primordial` + акцентное `Loader`), а `Title`/`Subtitle` показываются
+строкой ниже как «что грузим» (`iwakewar-scripts · v3.1`). Переопределить бренд
+можно через `Brand` / `BrandSuffix`.
 
 ```lua
-local Loader = UI:Loader({ Title = "iwakewar-scripts", Subtitle = "loader v3.1", Console = true })
+local Loader = UI:Loader({ Title = "iwakewar-scripts", Subtitle = "v3.1", Console = true })
 Loader:SetStatus("Fetching script...")
 Loader:SetProgress(0.35)
 Loader:Log("GET BFNFR Auto-Play.luau")
