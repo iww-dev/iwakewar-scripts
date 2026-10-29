@@ -9,11 +9,10 @@
 --   the game judges INSTANTLY, client-side, off the note's current Y.Scale:
 --   |off|<=16.5ms PERFECT, <=43.5 SICK, <=76.5 GOOD, <=106.5 OK, <=130.5 BAD,
 --   where off = 2000*|Y.Scale|/(11*NoteSpeed) - exactly our curMs.
---   So we aim the keypress at curMs == target (8=Perfect, 30=Sick) and only
---   pre-compensate the tiny press->NoteInput processing delay, which the
---   self-tuning inputLead learns in real ms (*1000, /1000 conversions).
---   The old code used *2000 / *2000 and a bogus latency lead, which pushed
---   presses early: Perfect notes drifted into Sick and Sick notes into Good.
+--   So we aim the keypress at curMs == target (4.5ms for Always Perfect) and
+--   pick the frame whose offset lands closest to it. No adaptive "input lead":
+--   the game judges off the exact note position we read, so any learned lead
+--   only ever drifted and pushed Perfect notes into Sick.
 
 local plr = game.Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -55,6 +54,7 @@ local Window = GUI:CreateWindow({
     Icon = "music",
     Theme = "Rose",
     Size = UDim2.fromOffset(760, 500),
+    ToggleKey = Enum.KeyCode.RightShift,
     Topbar = { Height = 40, ButtonsType = "Default" },
     OpenButton = { Enabled = true, Draggable = true, OnlyMobile = true, Scale = 1.1, CornerRadius = UDim.new(0, 6) },
 })
@@ -136,8 +136,6 @@ local SICK_CENTER = 31
 -- 57% Perfect / 43% Sick — ровно как написано в дропдауне
 local MIX_PERFECT_CHANCE = 57
 local perfectChance = MIX_PERFECT_CHANCE
-local inputLead = 49
-local calibFile = "iwakewar_bfnfr_inputlead.txt"
 
 -- === Humanizer / Accuracy ===
 -- Игра считает точность за ноту непрерывно от |off|: acc(off) ~= 1 - (off/130.5)^2
@@ -160,15 +158,8 @@ local function aimForAccuracy(pct: number): number
     return HIT_WINDOW * math.sqrt(math.max(0, 1 - a))
 end
 
-pcall(function()
-    local saved = readfile(calibFile)
-    local n = tonumber(saved)
-    if n then inputLead = math.clamp(n, 0, 90) end
-end)
-
-local function saveInputLead()
-    pcall(writefile, calibFile, string.format("%.1f", inputLead))
-end
+pcall(function() delfile("iwakewar_bfnfr_inputlead.txt") end)
+pcall(function() delfile("iwakewar_bfnfr_lead_v3.txt") end)
 
 local rateCache = setmetatable({}, { __mode = "k" })
 
@@ -301,60 +292,9 @@ local function pickTarget(): number
     return SICK_CENTER
 end
 
-local calibLog = 0
-
 -- сколько мс осталось ноте до линии (ровно то, чем игра считает оффсет)
 local function offsetMs(note: Instance): number
     return math.abs(note.Position.Y.Scale) / (11 * speed) * 2000
-end
-
--- msIndic игра пишет как signed-оффсет последнего попадания
--- ("-11.34ms" = рано, "+11.34ms" = поздно), но только при HitLate в настройках.
-local function readMsIndic(): string?
-    local lbl = mf:FindFirstChild("msIndic")
-    if lbl and lbl:IsA("TextLabel") and lbl.Visible then
-        return lbl.Text
-    end
-    return nil
-end
-
--- Калибровка: приоритет — реальный оффсет из msIndic, иначе старая оценка
--- «время до исчезновения ноты». inputLead — задержка пресса в мс: цель в том,
--- чтобы судейство происходило при curMs == target (то есть off == -target).
-local function calibrate(target: number, note: Instance, pressCurMs: number, pressClock: number, indicBefore: string?)
-    task.spawn(function()
-        local measured: number? = nil
-        if indicBefore ~= nil then
-            for _ = 1, 12 do
-                RunService.Heartbeat:Wait()
-                local txt = readMsIndic()
-                if txt and txt ~= indicBefore then
-                    measured = tonumber((txt:gsub("ms", "")))
-                    if measured then break end
-                end
-                if not note.Parent and txt == nil then break end
-            end
-        end
-        local adj: number? = nil
-        if measured then
-            adj = math.clamp((target + measured) * 0.5, -6, 6)
-        else
-            local latMs = (os.clock() - pressClock) * 1000
-            local judged = pressCurMs - latMs
-            if math.abs(judged) <= 130.5 then
-                adj = math.clamp((target - judged) * 0.5, -6, 6)
-            end
-        end
-        if adj then
-            inputLead = clampNum(inputLead + adj, 0, 90)
-            saveInputLead()
-            if calibLog < 40 then
-                calibLog = calibLog + 1
-                print(string.format("BFNFR-calib | target=%d pressCurMs=%.1f off=%s adj=%+.1f inputLead=%.1f",
-                    target, pressCurMs, measured and string.format("%.1f", measured) or "n/a", adj, inputLead))
-            end
-        end
-    end)
 end
 
 local function pressKey(lane: number)
@@ -415,71 +355,77 @@ end
 -- v4 = |Y|/(11*NoteSpeed), off = 2000*v4). Успешное нажатие стирает ноту
 -- (v3.Parent = nil; v3:Destroy()) и, для холда, кладёт Hold_<name> в Hold.Hitbox.
 -- Вне окна игра только проигрывает Tap(): ноту можно нажать ещё раз.
+--
+-- Момент пресса: позиция ноты обновляется раз в кадр, поэтому оффсет меняется
+-- шагами ~16мс. Ждём кадр, который окажется ближе всего к цели: если до цели
+-- осталось меньше половины кадра — жмём сейчас, а не после перелёта.
 local function pressNote(lane: number, note: Instance, ar: Instance, ks: Instance, st: table)
     if st.fired then return end
     st.fired = true
 
-    local function doPress()
-        if not note.Parent then return end
-        local indicBefore = readMsIndic()
-        local pressCurMs = offsetMs(note)
-        pressKey(lane)
-        calibrate(st.target, note, pressCurMs, os.clock(), indicBefore)
-    end
-
-    local function verify(retried: boolean)
-        task.spawn(function()
-            local confirmed = false
-            local frame: Instance? = nil
-            for _ = 1, 8 do
-                RunService.Heartbeat:Wait()
-                frame = findHoldFrame(ar, note.Name)
-                if not note.Parent then confirmed = true end
-                if confirmed or (frame and frame.Parent) then break end
-            end
-
-            if frame and frame.Parent then
-                hits = hits + 1
-                startHold(lane, note.Name, ks)
-                return
-            end
-
-            if confirmed then
-                hits = hits + 1
-                -- обычная нота: сразу отпускаем, чтобы не блокировать следующую
-                if not held[lane] then releaseKey(lane) end
-                return
-            end
-
-            -- Нажатие не засчитано: нота ещё жива. Если она всё ещё в окне —
-            -- ждём до sweetSpot и жмём повторно (промах не штрафуется).
-            local off = offsetMs(note)
-            if not retried and off <= 140 then
-                local waitMore = math.clamp((off - (st.target + inputLead)) / 1000, 0, 0.25)
-                if waitMore > 0 then task.wait(waitMore) end
-                if not note.Parent then return end
-                doPress()
-                verify(true)
-                return
-            end
-
-            RunService.Heartbeat:Wait()
-            if not held[lane] then releaseKey(lane) end
-        end)
-    end
-
-    local sweetSpot = st.target + inputLead
-    local waitT = math.clamp((offsetMs(note) - sweetSpot) / 1000, 0, 2)
-    if waitT > 0 then
-        task.delay(waitT, function()
+    task.spawn(function()
+        local sweetSpot = clampNum(st.target, 0, 150)
+        local dt = 1 / 60
+        while true do
             if not note.Parent then return end
-            doPress()
-            verify(false)
-        end)
-    else
+            local cur = offsetMs(note)
+            if cur > 400 then return end
+            if cur <= sweetSpot or (cur - sweetSpot) <= 1000 * dt * 0.5 then break end
+            local ok, newDt = pcall(function() return RunService.Heartbeat:Wait() end)
+            dt = (ok and tonumber(newDt)) or (1 / 60)
+            if not dt or dt <= 0 or dt > 0.2 then dt = 1 / 60 end
+        end
+
+        -- пресс строго в цель. никакой адаптивной калибровки: игра судит ровно по той
+        -- позиции ноты, которую читаем мы, поэтому лид только вредил и уползал.
+        local function doPress()
+            pressKey(lane)
+        end
+
+        local function verify(retried: boolean)
+            task.spawn(function()
+                local confirmed = false
+                local frame: Instance? = nil
+                for _ = 1, 8 do
+                    RunService.Heartbeat:Wait()
+                    frame = findHoldFrame(ar, note.Name)
+                    if not note.Parent then confirmed = true end
+                    if confirmed or (frame and frame.Parent) then break end
+                end
+
+                if frame and frame.Parent then
+                    hits = hits + 1
+                    startHold(lane, note.Name, ks)
+                    return
+                end
+
+                if confirmed then
+                    hits = hits + 1
+                    -- обычная нота: сразу отпускаем, чтобы не блокировать следующую
+                    if not held[lane] then releaseKey(lane) end
+                    return
+                end
+
+                -- Нажатие не засчитано: нота ещё жива. Если она всё ещё в окне —
+                -- ждём до sweetSpot и жмём повторно (промах не штрафуется).
+                local off = offsetMs(note)
+                if not retried and off <= 140 then
+                    local waitMore = math.clamp((off - st.target) / 1000, 0, 0.25)
+                    if waitMore > 0 then task.wait(waitMore) end
+                    if not note.Parent then return end
+                    doPress()
+                    verify(true)
+                    return
+                end
+
+                RunService.Heartbeat:Wait()
+                if not held[lane] then releaseKey(lane) end
+            end)
+        end
+
         doPress()
         verify(false)
-    end
+    end)
 end
 
 local function resetRun()
@@ -613,7 +559,7 @@ local togKey2 = Tabs.Main:Keybind({
 
 local bfnfrInfo = Tabs.Info:Paragraph({
     Title = "BFNFR Auto-Play",
-    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Accuracy modes: Never ~91-96%, Mix 57/43, Always ~99.88%\n- Side: auto from the game (File.CurrentPlayer) + manual override\n- Self-calibrating timing + msIndic auto-enabled\n- Anti-AFK built in\n\nPress H (or your keybind) to toggle.",
+    Content = "Premium auto player for Basically FNF: Remix\nby iwakewar team\n\n- Plays your lane with your own keybinds\n- Full Hit/Release animations (real key events)\n- Holds pressed and released correctly\n- Accuracy modes: Never ~91-96%, Mix 57/43, Always ~99.88%\n- Side: auto from the game (File.CurrentPlayer) + manual override\n- msIndic auto-enabled, no timing drift\n- Anti-AFK built in\n\nPress RightShift to open / close the menu.",
 })
 
 local discordBtn = Tabs.Info:Button({
@@ -693,16 +639,16 @@ task.spawn(function()
 
         pcall(function()
             Live:SetContent(string.format(
-                "state: %s  |  side: P%s  |  speed: %.2f  |  lead: %.0fms"
+                "state: %s  |  side: P%s  |  speed: %.2f"
                     .. "  |  acc: %s  |  P %s / S %s / G %s / B %s  |  hits: %d",
-                stxt, side, speed, inputLead, accStr,
+                stxt, side, speed, accStr,
                 counts.Perfect or "-", counts.Sick or "-", counts.Good or "-", counts.Bad or "-", hits
             ))
         end)
         if enabled and inTrack and tick() % 2 < 1 then
             print(string.format(
-                "BFNFR-counts | Perfect=%s Sick=%s Good=%s Bad=%s hits=%d acc=%s aim=%.1fms inputLead=%.1f speed=%.2f",
-                counts.Perfect, counts.Sick, counts.Good, counts.Bad, hits, accStr, aimTarget, inputLead, speed
+                "BFNFR-counts | Perfect=%s Sick=%s Good=%s Bad=%s hits=%d acc=%s aim=%.1fms speed=%.2f",
+                counts.Perfect, counts.Sick, counts.Good, counts.Bad, hits, accStr, aimTarget, speed
             ))
         end
     end
@@ -783,7 +729,7 @@ RunService.Heartbeat:Connect(function()
                 st.lastSign = s
                 if not st.fired then
                     local curMs = offsetMs(note)
-                    if curMs <= st.target + inputLead + 30 or crossing then
+                    if curMs <= st.target + 30 or crossing then
                         pressNote(lane, note, ar, ks, st)
                     end
                 end
@@ -792,8 +738,8 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-notify("BFNFR Auto-Play", "Loaded. Toggle with H.", 4)
-pcall(function() Window:SetToggleKey(Enum.KeyCode.LeftAlt) end)
+notify("BFNFR Auto-Play", "Loaded. Toggle with RightShift.", 4)
+pcall(function() Window:SetToggleKey(Enum.KeyCode.RightShift) end)
 
 -- live note scroll-rate measurement: derive the game's real NoteSpeed
 -- (the server value always clamps to 0.8, which is wrong for most songs).

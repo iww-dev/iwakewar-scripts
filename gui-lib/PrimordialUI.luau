@@ -241,7 +241,7 @@ function Lib:CreateWindow(cfg)
         Subtitle = cfg.Subtitle or ("v" .. Lib.Version),
         Tabs = {},
         Active = nil,
-        ToggleKey = cfg.ToggleKey or Enum.KeyCode.LeftAlt,
+        ToggleKey = cfg.ToggleKey or Enum.KeyCode.RightShift,
         Minimized = false,
     }, WindowProto)
     if cfg.Accent then P.accent = cfg.Accent end
@@ -353,11 +353,10 @@ function Lib:CreateWindow(cfg)
         Position = UDim2.new(0, 0, 1, -1),
     }, top)
 
-    local function topBtn(glyph, xOffset, color, onClick)
+    local function topBtn(xOffset, color, onClick)
         local b = button(top, {
-            Text = glyph,
+            Text = "",
             TextSize = 15,
-            TextColor3 = color or P.sub,
             TextXAlignment = Enum.TextXAlignment.Center,
             Size = UDim2.fromOffset(28, 22),
             Position = UDim2.new(1, xOffset, 0, 10),
@@ -370,12 +369,64 @@ function Lib:CreateWindow(cfg)
         b.MouseButton1Click:Connect(function() if onClick then pcall(onClick) end end)
         return b
     end
-    topBtn("\u{2715}", -38, P.danger, function() root.Visible = false end)
-    topBtn("\u{2013}", -72, P.sub, function()
+
+    -- иконки рисуем фреймами: JosefinSans не гарантирует наличие глифов ✕/–,
+    -- из-за чего кнопка закрытия выглядела пустой
+    local function drawCross(parent, size, color, thickness)
+        local holder = new("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(size, size),
+            Position = UDim2.fromScale(0.5, 0.5),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+        }, parent)
+        for i = 1, 2 do
+            local line = new("Frame", {
+                BackgroundColor3 = color,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 0, thickness or 1.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Rotation = (i == 1) and 45 or -45,
+            }, holder)
+            corner(line, 1)
+        end
+        return holder
+    end
+
+    local function drawMinus(parent, width, color, thickness)
+        return new("Frame", {
+            BackgroundColor3 = color,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(width, thickness or 1.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+        }, parent)
+    end
+
+    local closeBtn = topBtn(-38, P.sub, function() root.Visible = false end)
+    local closeIcon = drawCross(closeBtn, 9, P.sub, 1.5)
+    local function tintIcon(holder, color)
+        for _, line in ipairs(holder:GetChildren()) do
+            if line:IsA("Frame") then line.BackgroundColor3 = color end
+        end
+    end
+    closeBtn.MouseEnter:Connect(function() tintIcon(closeIcon, P.danger) end)
+    closeBtn.MouseLeave:Connect(function() tintIcon(closeIcon, P.sub) end)
+
+    local minBtn = topBtn(-72, P.sub, function()
         W.Minimized = not W.Minimized
         W.Body.Visible = not W.Minimized
         root.Size = W.Minimized and UDim2.fromOffset(root.AbsoluteSize.X, 42) or UDim2.fromOffset(winW, winH)
     end)
+    local minIcon = new("Frame", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(9, 9),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+    }, minBtn)
+    local minLine = drawMinus(minIcon, 9, P.sub, 1.5)
+    minBtn.MouseEnter:Connect(function() minLine.BackgroundColor3 = P.text end)
+    minBtn.MouseLeave:Connect(function() minLine.BackgroundColor3 = P.sub end)
 
     -- drag --------------------------------------------------------------
     local dragging, dragStart, startPos = false, nil, nil

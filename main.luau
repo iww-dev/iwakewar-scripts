@@ -121,12 +121,10 @@ local function copyText(text: string): boolean
     return false
 end
 
--- ============ 2014-style splash + terminal console ============
--- Строгий олдскульный лоадер: плоские панели, шрифт Code, углы 0,
--- бордеры 1px, кислотно-зелёный акцент. Фулскрин-дим оставлен.
--- Вместо "Game:/Status:"-лейблов -- маленькое окошко командной строки
--- с искусственными задержками + шагающий бар без процентов.
-local function buildSplash()
+-- ============ 2014-style splash + terminal console (fallback) ============
+-- Используется только если PrimordialUI не скачался: тогда грузим старый
+-- терминальный сплэш, чтобы лоадер не умер молча.
+local function buildLegacySplash()
     local player = Players.LocalPlayer
     if not player then
         return nil
@@ -463,6 +461,10 @@ local function buildSplash()
         closeBtn.Visible = true
     end
 
+    ui.setStatus = function(text: string)
+        ui.log("> " .. text, C_DIMTXT)
+    end
+
     -- Ручное закрытие (кнопка Close) работает всегда.
     -- Автозакрытие по успеху проверяет флаг и не срабатывает после fail.
     ui.close = function()
@@ -500,97 +502,123 @@ local function runWithoutSplash()
 end
 
 local function loadWithSplash(ui)
-    -- 1) скрипт ждёт...
-    task.wait(math.random(40, 110) / 100) -- 0.4-1.1с искусственной задержки
-    ui.log("> boot...", Color3.fromRGB(140, 140, 140))
-
-    -- 2) Executor
-    task.wait(math.random(50, 120) / 100) -- *ждёт* перед executor
+    ui.setStatus("Checking executor...")
+    ui.progress(0.06, "Checking executor...")
+    task.wait(0.2)
     ui.log("executor: " .. getExecutorName(), Color3.fromRGB(220, 220, 220))
 
-    -- 3) скрипт ждёт...
-    task.wait(math.random(50, 120) / 100)
+    ui.progress(0.15, "Detecting game...")
+    task.wait(0.15)
     local info, idShown = detectGame()
-
-    -- 4) Game + 5) Status БЕЗ паузы между ними
     if not info then
         ui.log("game: unknown (" .. tostring(idShown) .. ")", Color3.fromRGB(220, 220, 220))
-        ui.log("status: NOT SUPPORTED", Color3.fromRGB(255, 60, 60))
-        task.wait(math.random(80, 150) / 100) -- *ждёт после Status*
-        ui.fail(
-            "This game is not supported (yet).",
-            "place=" .. tostring(idShown)
-        )
-        ui.showClose()
+        ui.fail("This game is not supported (yet).", "place=" .. tostring(idShown))
         return
     end
-    ui.log("game: " .. info.name, Color3.fromRGB(220, 220, 220))
-    ui.log("status: SUPPORTED", Color3.fromRGB(0, 255, 0))
+    ui.setGame(info.name, true)
 
-    -- 6) ждёт после Status...
-    task.wait(math.random(80, 150) / 100)
-
-    -- 7) Loading...... + снизу шагающий бар (без процентов)
-    local loadLabel: any = ui.log("loading", Color3.fromRGB(140, 140, 140))
-    ui.startMarquee()
-
-    -- задержка loading-степа: рандом 0.5 - 14 секунд
-    local loadTime = 0.5 + math.random() * 13.5
-    local t0 = os.clock()
-    task.spawn(function()
-        local dots = 0
-        while os.clock() - t0 < loadTime do
-            dots = (dots % 6) + 1
-            if loadLabel and loadLabel.Parent then
-                loadLabel.Text = "loading" .. string.rep(".", dots)
-            end
-            task.wait(0.25)
-        end
-    end)
-
-    -- качаем ПАРАЛЛЕЛЬНО с анимацией, чтобы точки не врали
-    local src: string? = nil
-    local ferr: string? = nil
-    local done = false
-    task.spawn(function()
-        src, ferr = fetch(info.url)
-        done = true
-    end)
-    while not done and os.clock() - t0 < loadTime do
-        task.wait(0.1)
-    end
-    -- если скачалось быстрее задержки -- дотягиваем паузу до конца (вайб 2014),
-    -- если дольше -- ждём дальше
-    while os.clock() - t0 < loadTime do
-        task.wait(0.1)
-    end
-    while not done do
-        task.wait(0.1)
-    end
-
+    ui.progress(0.3, "Fetching " .. info.name .. "...")
+    local src, ferr = fetch(info.url)
     if not src then
-        if loadLabel then loadLabel.Text = "loading... failed" end
         ui.fail("Failed to download script.", tostring(ferr) .. " :: " .. info.url)
-        ui.showClose()
         return
     end
+    ui.log(string.format("GET %s (%.1f KB)", info.name, #src / 1024))
+    ui.progress(0.72, "Injecting...")
+    task.wait(0.15)
 
-    if loadLabel then loadLabel.Text = "loading...... ok" end
-    ui.log("> injecting " .. info.name .. "...", Color3.fromRGB(140, 140, 140))
-
-    local okRun, rerr = runSource(src :: string, info.name)
+    local okRun, rerr = runSource(src, info.name)
     if okRun then
-        ui.ok("done! enjoy.")
-        task.delay(1.2, function()
-            -- если за это время случился fail -- не закрываемся
-            if not ui.didFail() then
-                ui.close()
-            end
+        ui.progress(1, "Loaded")
+        ui.ok("Loaded - enjoy")
+        task.delay(1.4, function()
+            if not ui.didFail() then ui.close() end
         end)
     else
         ui.fail("Script errored.", tostring(rerr))
-        ui.showClose()
     end
+end
+
+-- ============ Primordial splash (our own gui-lib) ============
+local LIB_URL = BASE .. "gui-lib/PrimordialUI.luau"
+
+local function loadPrimordial(): any
+    if typeof(loadstring) ~= "function" then return nil end
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet(LIB_URL))()
+    end)
+    if ok and typeof(res) == "table" and typeof(res.Loader) == "function" then
+        return res
+    end
+    warn("[iwakewar-scripts] PrimordialUI unavailable: " .. tostring(res))
+    return nil
+end
+
+local function buildPrimordialSplash()
+    local UI = loadPrimordial()
+    if not UI then return nil end
+    local ok, L = pcall(function()
+        return UI:Loader({
+            Title = "iwakewar-scripts",
+            Subtitle = "loader v3.1",
+            Status = "Booting...",
+            Console = true,
+            Width = 470,
+            CloseDelay = 0.8,
+        })
+    end)
+    if not ok or typeof(L) ~= "table" then
+        warn("[iwakewar-scripts] Primordial loader failed: " .. tostring(L))
+        return nil
+    end
+
+    local failed = false
+    local lastError: string? = nil
+    local ui: any = {}
+    local C_OK = Color3.fromRGB(148, 219, 168)
+    local C_BAD = Color3.fromRGB(214, 94, 103)
+    local C_DIM = Color3.fromRGB(139, 139, 150)
+
+    ui.log = function(text: string, color: Color3?)
+        pcall(function() L:Log(text, color) end)
+    end
+    ui.startMarquee = function() end
+    ui.progress = function(frac: number, text: string?, _color: Color3?)
+        pcall(function() L:SetProgress(frac, text) end)
+    end
+    ui.setStatus = function(text: string)
+        pcall(function() L:SetStatus(text) end)
+    end
+    ui.setGame = function(name: string, supported: boolean)
+        ui.log("game: " .. name, supported and C_OK or C_BAD)
+    end
+    ui.fail = function(msg: string, detail: string?)
+        failed = true
+        local full = msg
+        if detail and #detail > 0 then
+            full = msg .. "  |  " .. detail
+        end
+        lastError = full
+        warn("[iwakewar-scripts] " .. full)
+        pcall(function() L:Fail(full:sub(1, 160)) end)
+    end
+    ui.ok = function(msg: string)
+        pcall(function() L:Done(msg or "Loaded") end)
+    end
+    ui.showClose = function() end
+    ui.close = function()
+        pcall(function() L:Destroy() end)
+    end
+    ui.didFail = function(): boolean return failed end
+    ui.getError = function(): string? return lastError end
+    ui.loader = L
+    return ui
+end
+
+local function buildSplash()
+    local ui = buildPrimordialSplash()
+    if ui then return ui end
+    return buildLegacySplash()
 end
 
 local okBuild, splashUi = pcall(buildSplash)
