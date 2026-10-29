@@ -11,25 +11,13 @@ local GAME_INFO = {
         name = "Basically FNF: Remix",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau",
     },
-    ["107778070777162"] = {
-        name = "Steal An Egg",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/StealAnEgg.luau",
-    },
     ["142823291"] = {
         name = "Murder Mystery 2",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
     },
-    ["6839171747"] = {
-        name = "DOORS",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Doors.luau",
-    },
     ["9872472334"] = {
         name = "Evade",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Evade.luau",
-    },
-    ["123907164579958"] = {
-        name = "Hidden Within",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/HW.luau",
     },
     ["537413528"] = {
         name = "Build A Boat For Treasure",
