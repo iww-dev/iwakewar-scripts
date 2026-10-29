@@ -822,21 +822,11 @@ function Lib:CreateWindow(cfg)
     -- popup ---------------------------------------------------------------
     local openPopup = nil
     local openPopupAnchor = nil
-    local openPopupShadow = nil
-
-    local function clearPopupShadow()
-        if not openPopupShadow then return end
-        for _, f in ipairs(openPopupShadow) do
-            pcall(function() f:Destroy() end)
-        end
-        openPopupShadow = nil
-    end
 
     local function closePopup(instant)
         local pop = openPopup
         openPopup = nil
         openPopupAnchor = nil
-        clearPopupShadow()
         if not pop then return end
         if instant then
             pcall(function() pop:Destroy() end)
@@ -888,10 +878,6 @@ function Lib:CreateWindow(cfg)
         listLayout(pop, 1)
         openPopup = pop
         openPopupAnchor = anchor
-        local _, shFrames = softShadow(root, pop, {
-            Layers = 6, Spread = 18, Alpha = 0.34, Y = 6, Radius = 5, ZIndex = 39,
-        })
-        openPopupShadow = shFrames
 
         for i, item in ipairs(items) do
             local isCur = (item == current)
@@ -906,14 +892,18 @@ function Lib:CreateWindow(cfg)
                 ZIndex = 41,
             })
             corner(row, 3)
-            padAll(row, 8, 0, 8, 0)
+            -- акцентная полоска выбранного пункта. Живёт внутри кнопки, поэтому
+            -- её сдвигает тот же UIPadding, что и текст: компенсируем отступ,
+            -- иначе полоска наезжает на первую букву.
+            local rowPad = 14
+            padAll(row, rowPad, 0, 8, 0)
             if isCur then
                 local curBar = new("Frame", {
                     BackgroundColor3 = P.accent,
                     BackgroundTransparency = 0,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(0, 2, 1, -8),
-                    Position = UDim2.new(0, 0, 0, 4),
+                    Size = UDim2.new(0, 2, 1, -12),
+                    Position = UDim2.fromOffset(rowPad * -1 + 5, 6),
                     ZIndex = 42,
                 }, row)
                 corner(curBar, 1)
@@ -2216,6 +2206,11 @@ function Lib:Notify(opts)
     return nil
 end
 Lib.CreateNotification = Lib.Notify
+
+-- мягкая тень вокруг произвольного элемента (оставлена как публичный хелпер:
+-- окно/лоадер/дропдаун её больше не используют — в оригинальном primordial
+-- внешних ореолов нет).
+Lib.SoftShadow = softShadow
 
 local genv = getgenv and getgenv() or _G
 genv.PrimordialUI = Lib
