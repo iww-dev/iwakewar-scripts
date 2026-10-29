@@ -30,41 +30,41 @@ local plr = Players.LocalPlayer
 -- palette
 -- ======================================================================
 local P = {
-    bg = Color3.fromRGB(19, 19, 21),
-    chrome = Color3.fromRGB(15, 15, 17),
-    stroke = Color3.fromRGB(46, 46, 52),
-    card = Color3.fromRGB(29, 29, 33),
-    cardHead = Color3.fromRGB(38, 38, 43),
-    cardHover = Color3.fromRGB(35, 35, 40),
-    element = Color3.fromRGB(43, 43, 49),
-    elementHover = Color3.fromRGB(54, 54, 61),
-    text = Color3.fromRGB(233, 233, 238),
-    sub = Color3.fromRGB(139, 139, 150),
-    dim = Color3.fromRGB(94, 94, 104),
+    bg = Color3.fromRGB(42, 42, 45),
+    chrome = Color3.fromRGB(36, 36, 39),
+    stroke = Color3.fromRGB(86, 86, 94),
+    card = Color3.fromRGB(53, 53, 57),
+    cardHead = Color3.fromRGB(62, 62, 67),
+    cardHover = Color3.fromRGB(59, 59, 64),
+    element = Color3.fromRGB(68, 68, 74),
+    elementHover = Color3.fromRGB(80, 80, 88),
+    text = Color3.fromRGB(236, 236, 241),
+    sub = Color3.fromRGB(160, 160, 171),
+    dim = Color3.fromRGB(118, 118, 128),
     accent = Color3.fromRGB(216, 132, 171),
-    track = Color3.fromRGB(54, 54, 61),
+    track = Color3.fromRGB(86, 86, 94),
     knob = Color3.fromRGB(238, 238, 244),
     danger = Color3.fromRGB(214, 94, 103),
     checkMark = Color3.fromRGB(26, 18, 22),
 
     -- градиентные пары (верх/низ) для объёма: окно, карточки, элементы.
     -- Всё в тех же тёмных оттенках, чтобы не выбиваться из палитры.
-    bgTop = Color3.fromRGB(25, 25, 28),
-    bgBottom = Color3.fromRGB(14, 14, 16),
-    chromeTop = Color3.fromRGB(19, 19, 22),
-    chromeBottom = Color3.fromRGB(11, 11, 13),
-    sidebarTop = Color3.fromRGB(17, 17, 20),
-    sidebarBottom = Color3.fromRGB(12, 12, 14),
-    cardTop = Color3.fromRGB(38, 38, 44),
-    cardBottom = Color3.fromRGB(28, 28, 32),
-    cardHoverTop = Color3.fromRGB(45, 45, 52),
-    cardHoverBottom = Color3.fromRGB(34, 34, 39),
-    headTop = Color3.fromRGB(51, 51, 58),
-    headBottom = Color3.fromRGB(39, 39, 45),
-    elemTop = Color3.fromRGB(57, 57, 65),
-    elemBottom = Color3.fromRGB(43, 43, 50),
-    elemHoverTop = Color3.fromRGB(68, 68, 78),
-    elemHoverBottom = Color3.fromRGB(53, 53, 61),
+    bgTop = Color3.fromRGB(47, 47, 51),
+    bgBottom = Color3.fromRGB(36, 36, 39),
+    chromeTop = Color3.fromRGB(41, 41, 44),
+    chromeBottom = Color3.fromRGB(31, 31, 34),
+    sidebarTop = Color3.fromRGB(41, 41, 44),
+    sidebarBottom = Color3.fromRGB(34, 34, 37),
+    cardTop = Color3.fromRGB(58, 58, 63),
+    cardBottom = Color3.fromRGB(48, 48, 52),
+    cardHoverTop = Color3.fromRGB(64, 64, 70),
+    cardHoverBottom = Color3.fromRGB(54, 54, 59),
+    headTop = Color3.fromRGB(71, 71, 77),
+    headBottom = Color3.fromRGB(59, 59, 64),
+    elemTop = Color3.fromRGB(75, 75, 82),
+    elemBottom = Color3.fromRGB(62, 62, 68),
+    elemHoverTop = Color3.fromRGB(88, 88, 96),
+    elemHoverBottom = Color3.fromRGB(72, 72, 80),
     accentTop = Color3.fromRGB(233, 157, 192),
     accentBottom = Color3.fromRGB(188, 105, 145),
     rim = Color3.fromRGB(255, 255, 255),
@@ -426,11 +426,11 @@ function Lib:CreateWindow(cfg)
     vgrad(root, P.bgTop, P.bgBottom)
     local rootStroke = stroke(root, P.stroke, 1, 0.1)
     strokeGrad(rootStroke,
-        Color3.fromRGB(86, 86, 98),
-        Color3.fromRGB(30, 30, 35),
+        Color3.fromRGB(108, 108, 120),
+        Color3.fromRGB(46, 46, 50),
         numberSeq({ { 0, 0.1 }, { 0.55, 0.35 }, { 1, 0.62 } }))
-    -- мягкая тень вокруг окна: несколько полупрозрачных слоёв
-    softShadow(gui, root, { Layers = 7, Spread = 22, Alpha = 0.5, Y = 5, Radius = 7, ZIndex = 1 })
+    -- окно лежит на игре без внешней тени: оригинальный primordial не даёт
+    -- ореола вокруг GUI, а тёмный ореол на светлом фоне читается как грязь
     W.Frame = root
     -- верхний блик по кромке окна
     local rootRim = new("Frame", {
@@ -615,7 +615,7 @@ function Lib:CreateWindow(cfg)
         ZIndex = 5,
     }, body)
     vgrad(topShade, Color3.new(0, 0, 0), Color3.new(0, 0, 0), numberSeq({
-        { 0, 0.7 }, { 1, 1 },
+        { 0, 0.88 }, { 1, 1 },
     }))
 
     local sidebar = new("Frame", {
@@ -742,7 +742,7 @@ function Lib:CreateWindow(cfg)
         vgrad(card, P.cardTop, P.cardBottom)
         rimLight(card, 1, 0.95, 1, 3)
         local st = stroke(card, P.stroke, 1, 1)
-        strokeGrad(st, Color3.fromRGB(92, 92, 105), Color3.fromRGB(30, 30, 35),
+        strokeGrad(st, Color3.fromRGB(112, 112, 124), Color3.fromRGB(46, 46, 50),
             numberSeq({ { 0, 1 }, { 1, 1 } }))
         -- отступы прямо на карточке: AutomaticSize учитывает UIPadding,
         -- поэтому высота всегда совпадает с текстом
@@ -877,11 +877,11 @@ function Lib:CreateWindow(cfg)
             ClipsDescendants = true,
         }, root)
         corner(pop, 4)
-        vgrad(pop, Color3.fromRGB(46, 46, 53), Color3.fromRGB(33, 33, 38))
+        vgrad(pop, Color3.fromRGB(58, 58, 64), Color3.fromRGB(48, 48, 52))
         local popStroke = stroke(pop, P.stroke, 1, 0.05)
         strokeGrad(popStroke,
-            Color3.fromRGB(105, 105, 120),
-            Color3.fromRGB(34, 34, 39),
+            Color3.fromRGB(120, 120, 134),
+            Color3.fromRGB(48, 48, 52),
             numberSeq({ { 0, 0.05 }, { 0.6, 0.35 }, { 1, 0.62 } }))
         rimLight(pop, 1, 0.93, 1, 3)
         padAll(pop, 4, 4, 4, 4)
@@ -958,10 +958,10 @@ function Lib:CreateWindow(cfg)
         local card = new(class, props, parent)
         corner(card, 4)
         vgrad(card, P.cardTop, P.cardBottom)
-        local cardStroke = stroke(card, P.stroke, 1, 0.45)
+        local cardStroke = stroke(card, P.stroke, 1, 0.3)
         strokeGrad(cardStroke,
-            Color3.fromRGB(78, 78, 90),
-            Color3.fromRGB(32, 32, 37),
+            Color3.fromRGB(100, 100, 112),
+            Color3.fromRGB(46, 46, 50),
             numberSeq({ { 0, 0.35 }, { 0.5, 0.55 }, { 1, 0.7 } }))
         rimLight(card, 1, 0.955, 1, 3)
         listLayout(card, 0)
@@ -1141,7 +1141,7 @@ function Lib:CreateWindow(cfg)
             Position = UDim2.new(0, 6, 0.5, -2),
         }, holder)
         corner(track, 2)
-        vgrad(track, Color3.fromRGB(33, 33, 38), Color3.fromRGB(62, 62, 71))
+        vgrad(track, Color3.fromRGB(52, 52, 57), Color3.fromRGB(78, 78, 86))
         local fill = new("Frame", {
             BackgroundColor3 = P.accent,
             BorderSizePixel = 0,
@@ -1384,7 +1384,7 @@ function Lib:CreateWindow(cfg)
             CanvasSize = UDim2.new(0, 0, 0, 0),
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             ScrollBarThickness = 3,
-            ScrollBarImageColor3 = Color3.fromRGB(72, 72, 80),
+            ScrollBarImageColor3 = Color3.fromRGB(96, 96, 104),
             ScrollBarImageTransparency = 0.35,
             ScrollingDirection = Enum.ScrollingDirection.Y,
         }, page)
@@ -1969,10 +1969,9 @@ function Lib:Loader(cfg)
     vgrad(win, P.bgTop, P.bgBottom)
     local winStroke = stroke(win, P.stroke, 1, 0.05)
     strokeGrad(winStroke,
-        Color3.fromRGB(86, 86, 98),
-        Color3.fromRGB(30, 30, 35),
+        Color3.fromRGB(108, 108, 120),
+        Color3.fromRGB(46, 46, 50),
         numberSeq({ { 0, 0.08 }, { 1, 0.6 } }))
-    softShadow(gui, win, { Layers = 6, Spread = 20, Alpha = 0.45, Y = 5, Radius = 7 })
     rimLight(win, 1, 0.92, 1, 3)
 
     local markHolder = new("Frame", {
@@ -2034,7 +2033,7 @@ function Lib:Loader(cfg)
         Position = UDim2.fromOffset(18, 96),
     }, win)
     corner(track, 2)
-    vgrad(track, Color3.fromRGB(30, 30, 35), Color3.fromRGB(62, 62, 71))
+    vgrad(track, Color3.fromRGB(52, 52, 57), Color3.fromRGB(78, 78, 86))
     local fill = new("Frame", {
         BackgroundColor3 = P.accent,
         BorderSizePixel = 0,
@@ -2061,9 +2060,9 @@ function Lib:Loader(cfg)
             ClipsDescendants = true,
         }, win)
         corner(box, 4)
-        vgrad(box, Color3.fromRGB(15, 15, 18), Color3.fromRGB(10, 10, 12))
+        vgrad(box, Color3.fromRGB(26, 26, 30), Color3.fromRGB(20, 20, 23))
         local logStroke = stroke(box, P.stroke, 1, 0.5)
-        strokeGrad(logStroke, Color3.fromRGB(58, 58, 68), Color3.fromRGB(24, 24, 28),
+        strokeGrad(logStroke, Color3.fromRGB(80, 80, 90), Color3.fromRGB(40, 40, 44),
             numberSeq({ { 0, 0.45 }, { 1, 0.7 } }))
         rimLight(box, 1, 0.96, 1, 3)
         padAll(box, 10, 8, 10, 8)
