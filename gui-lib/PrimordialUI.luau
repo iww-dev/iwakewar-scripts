@@ -724,12 +724,31 @@ function Lib:CreateWindow(cfg)
     nLayout.SortOrder = Enum.SortOrder.LayoutOrder
     nLayout.Parent = notifyHolder
 
+    -- Notify: типы, акцентная полоска, прогресс-линия и закрытие по клику.
+    -- Полоска/прогресс — дети card, а card несёт UIPadding ради AutomaticSize,
+    -- поэтому их координаты компенсируют паддинг (иначе их сдвигает на текст).
+    local NOTIFY_PAD_L, NOTIFY_PAD_R, NOTIFY_PAD_V = 16, 14, 9
+    local NOTIFY_TYPES = {
+        info = P.accent,
+        success = Color3.fromRGB(126, 214, 155),
+        warn = Color3.fromRGB(231, 190, 120),
+        error = Color3.fromRGB(214, 94, 103),
+    }
+
     local notifyOrder = 0
     function W:Notify(opts)
         opts = opts or {}
         notifyOrder = notifyOrder + 1
         local hold = math.max(0.6, tonumber(opts.Duration) or 4)
-        local card = new("Frame", {
+        local accent = opts.Accent
+            or NOTIFY_TYPES[tostring(opts.Type or "info"):lower()]
+            or P.accent
+        local padX = NOTIFY_PAD_L + NOTIFY_PAD_R
+        local closed = false
+
+        local card = new("TextButton", {
+            Text = "",
+            AutoButtonColor = false,
             BackgroundColor3 = P.card,
             BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 0),
@@ -738,7 +757,7 @@ function Lib:CreateWindow(cfg)
             ClipsDescendants = true,
             LayoutOrder = notifyOrder,
         }, notifyHolder)
-        corner(card, 4)
+        corner(card, 5)
         vgrad(card, P.cardTop, P.cardBottom)
         rimLight(card, 1, 0.95, 1, 3)
         local st = stroke(card, P.stroke, 1, 1)
@@ -746,76 +765,119 @@ function Lib:CreateWindow(cfg)
             numberSeq({ { 0, 1 }, { 1, 1 } }))
         -- отступы прямо на карточке: AutomaticSize учитывает UIPadding,
         -- поэтому высота всегда совпадает с текстом
-        padAll(card, 16, 9, 14, 9)
+        padAll(card, NOTIFY_PAD_L, NOTIFY_PAD_V, NOTIFY_PAD_R, NOTIFY_PAD_V)
+
         local inner = new("Frame", {
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
         }, card)
-        listLayout(inner, 3)
-        -- акцентная полоска слева: высоту берём у inner, а не scale,
-        -- иначе AutomaticSize зацикливается и карточка растягивается на весь экран
+        listLayout(inner, 4)
+
+        -- акцентная полоска: 5 px от левой кромки, высоту берём у inner,
+        -- а не scale — иначе AutomaticSize зацикливается
         local bar = new("Frame", {
-            BackgroundColor3 = opts.Accent or P.accent,
+            BackgroundColor3 = accent,
             BorderSizePixel = 0,
             Size = UDim2.new(0, 2, 0, 0),
-            Position = UDim2.fromOffset(0, 8),
+            Position = UDim2.fromOffset(-NOTIFY_PAD_L + 5, 4),
             BackgroundTransparency = 1,
             ZIndex = 2,
         }, card)
         corner(bar, 1)
-        vgrad(bar, opts.Accent or P.accentTop, opts.Accent or P.accentBottom)
+        vgrad(bar, accent:Lerp(Color3.new(1, 1, 1), 0.22), accent:Lerp(Color3.new(0, 0, 0), 0.15))
         local barGlow = new("Frame", {
-            BackgroundColor3 = opts.Accent or P.accent,
+            BackgroundColor3 = accent,
             BorderSizePixel = 0,
-            Size = UDim2.new(0, 6, 0, 0),
-            Position = UDim2.fromOffset(-2, 6),
+            Size = UDim2.new(0, 7, 0, 0),
+            Position = UDim2.fromOffset(-NOTIFY_PAD_L + 2, 2),
             BackgroundTransparency = 1,
             ZIndex = 1,
         }, card)
         corner(barGlow, 3)
         local function syncBar()
-            local h = math.max(0, inner.AbsoluteSize.Y - 16)
+            local h = math.max(0, inner.AbsoluteSize.Y - 8)
             bar.Size = UDim2.new(0, 2, 0, h)
-            barGlow.Size = UDim2.new(0, 6, 0, h + 4)
+            barGlow.Size = UDim2.new(0, 7, 0, h + 4)
         end
         syncBar()
         inner:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncBar)
+
+        -- прогресс-линия внизу: сколько уведомление ещё проживёт
+        local progHolder = new("Frame", {
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.65,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, padX, 0, 2),
+            Position = UDim2.new(0, -NOTIFY_PAD_L, 1, NOTIFY_PAD_V - 2),
+            ClipsDescendants = true,
+            ZIndex = 3,
+        }, card)
+        local prog = new("Frame", {
+            BackgroundColor3 = accent,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 0.55,
+            ZIndex = 4,
+        }, progHolder)
+
         local t1 = text(inner, {
             Text = tostring(opts.Title or "Notification"),
             TextSize = 14,
-            Size = UDim2.new(1, 0, 0, 18),
+            Size = UDim2.new(1, -6, 0, 18),
             TextTransparency = 1,
             TextTruncate = Enum.TextTruncate.AtEnd,
+            ZIndex = 2,
             LayoutOrder = 1,
         }, W_SEMI)
         local c1 = text(inner, {
             Text = tostring(opts.Content or ""),
             TextColor3 = P.sub,
             TextSize = 13,
-            Size = UDim2.new(1, 0, 0, 0),
+            Size = UDim2.new(1, -6, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
             TextWrapped = true,
             TextTransparency = 1,
+            ZIndex = 2,
             LayoutOrder = 2,
         })
+
+        local function dismiss(instant)
+            if closed then return end
+            closed = true
+            local t = instant and 0.12 or 0.22
+            tween(card, t, { BackgroundTransparency = 1 })
+            tween(st, t, { Transparency = 1 })
+            tween(bar, t, { BackgroundTransparency = 1 })
+            tween(barGlow, t, { BackgroundTransparency = 1 })
+            tween(progHolder, t, { BackgroundTransparency = 1 })
+            tween(prog, t, { BackgroundTransparency = 1 })
+            tween(t1, t, { TextTransparency = 1 })
+            tween(c1, t, { TextTransparency = 1 })
+            task.delay(t + 0.05, function() pcall(function() card:Destroy() end) end)
+        end
+
+        -- клик по уведомлению закрывает его сразу
+        card.MouseEnter:Connect(function()
+            if closed then return end
+            tween(st, 0.12, { Transparency = 0.05 })
+        end)
+        card.MouseLeave:Connect(function()
+            tween(st, 0.12, { Transparency = 0.25 })
+        end)
+        card.MouseButton1Click:Connect(function() dismiss(true) end)
+
         tween(card, 0.16, { BackgroundTransparency = 0 })
         tween(st, 0.16, { Transparency = 0.25 })
         tween(bar, 0.16, { BackgroundTransparency = 0 })
         tween(barGlow, 0.16, { BackgroundTransparency = 0.86 })
+        tween(progHolder, 0.16, { BackgroundTransparency = 0.65 })
         tween(t1, 0.16, { TextTransparency = 0 })
         tween(c1, 0.16, { TextTransparency = 0 })
-        task.delay(hold, function()
-            if not card.Parent then return end
-            tween(card, 0.22, { BackgroundTransparency = 1 })
-            tween(st, 0.22, { Transparency = 1 })
-            tween(bar, 0.22, { BackgroundTransparency = 1 })
-            tween(barGlow, 0.22, { BackgroundTransparency = 1 })
-            tween(t1, 0.22, { TextTransparency = 1 })
-            tween(c1, 0.22, { TextTransparency = 1 })
-            task.wait(0.25)
-            pcall(function() card:Destroy() end)
-        end)
+        TweenService:Create(prog, TweenInfo.new(hold, Enum.EasingStyle.Linear), {
+            Size = UDim2.new(0, 0, 1, 0),
+        }):Play()
+        task.delay(hold, function() dismiss(false) end)
         return card
     end
 

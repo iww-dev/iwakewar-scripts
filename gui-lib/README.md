@@ -55,6 +55,9 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 - чекбокс: градиентная заливка, блик, тень под квадратом и розовое свечение,
   когда включён; ползунок: градиентный трек, градиентная заливка, блик и
   ореол вокруг кнопки;
+- уведомление: акцентная полоска слева (5 px от кромки, 9 px до заголовка),
+  цвет по `Type` (`info` розовый, `success` зелёный, `warn` жёлтый,
+  `error` красный), прогресс-линия внизу карточки и закрытие по клику;
 - активная вкладка сайдбара — градиентная подложка + светящаяся акцентная
   полоска; активный чипс — градиентное подчёркивание с мягким свечением.
 
@@ -76,8 +79,8 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 | `Tab:Keybind({Title, Description, Mode, Default, Callback})` | бинд, `Mode = "Toggle"` или `"Hold"` |
 | `Tab:Slider({Title, Min, Max, Value, Callback})` | ползунок |
 | `Tab:Button({Title, Description, Callback})` | кнопка-строка |
-| `UI:Notify({Title, Content, Duration, Accent})` | уведомление справа сверху |
-| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()` |
+| `UI:Notify({Title, Content, Duration, Type, Accent})` | уведомление справа сверху; `Type` = `"info"` / `"success"` / `"warn"` / `"error"` |
+| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()`, `:SetTimeout(sec)`, `:ShowClose()` |
 | `UI:OnLangChanged(fn)` / `UI:SetLang(l)` | подписка на смену языка |
 
 ## Loader mode — «Primordial Loader»
