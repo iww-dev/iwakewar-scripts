@@ -127,6 +127,7 @@ local tracked = setmetatable({}, { __mode = "k" })
 local held = {}
 local lastJump = 0
 local hits = 0
+
 local noNotifications = false
 
 local DEFAULT_KEYS = { "D", "F", "J", "K", "Left", "Down", "Up", "Right" }
@@ -307,12 +308,16 @@ end
 
 local function pressKey(lane: number)
     local kc = laneKeys[lane]
-    if kc then VIM:SendKeyEvent(true, kc, false, game) end
+    if kc then
+        VIM:SendKeyEvent(true, kc, false, game)
+    end
 end
 
 local function releaseKey(lane: number)
     local kc = laneKeys[lane]
-    if kc then VIM:SendKeyEvent(false, kc, false, game) end
+    if kc then
+        VIM:SendKeyEvent(false, kc, false, game)
+    end
 end
 
 local function releaseAll()
@@ -320,6 +325,12 @@ local function releaseAll()
         held[lane] = nil
         releaseKey(lane)
     end
+end
+
+local function findHoldInHitbox(ar: Instance, noteName: string): Instance?
+    local Hold = ar:FindFirstChild("Hold")
+    local hb = Hold and Hold:FindFirstChild("Hitbox")
+    return hb and hb:FindFirstChild("Hold_" .. noteName) or nil
 end
 
 local function findHoldFrame(ar: Instance, noteName: string): Instance?
@@ -374,11 +385,24 @@ local function pressNote(lane: number, note: Instance, ar: Instance, ks: Instanc
     task.spawn(function()
         local sweetSpot = clampNum(st.target, 0, 150)
         local dt = 1 / 60
+        local prev = nil
         while true do
             if not note.Parent then return end
             local cur = offsetMs(note)
             if cur > 400 then return end
             if cur <= sweetSpot or (cur - sweetSpot) <= 1000 * dt * 0.5 then break end
+            -- offsetMs возвращает МОДУЛЬ расстояния: если нота между кадрами
+            -- перепрыгнула линию (просадка кадра / твин догнал время), cur после
+            -- цели снова РАСТЁТ, и ждать "пока cur <= sweetSpot" бессмысленно —
+            -- раньше цикл молча уходил в return, и нота проезжала в NM.
+            -- Поэтому: как только cur перестала убывать — жмём сразу (лучше
+            -- Sick/Good в окне, чем пропуск).
+            if prev and cur > prev + 2 then
+                -- уже вне окна: пресс всё равно уйдёт в "M"-мисс, жать нет смысла
+                if cur > 130.5 then return end
+                break
+            end
+            prev = cur
             local ok, newDt = pcall(function() return RunService.Heartbeat:Wait() end)
             dt = (ok and tonumber(newDt)) or (1 / 60)
             if not dt or dt <= 0 or dt > 0.2 then dt = 1 / 60 end
@@ -390,39 +414,44 @@ local function pressNote(lane: number, note: Instance, ar: Instance, ks: Instanc
             pressKey(lane)
         end
 
-        local function verify(retried: boolean)
+        -- Подтверждение попадания: единственный надёжный признак того, что игра
+        -- засчитала пресс — она уничтожает ноту (v3.Parent = nil; v3:Destroy()).
+        -- НЕЛЬЗЯ считать подтверждением наличие Hold_<name>: игра кладёт этот
+        -- фрейм в Notes ещё при создании ноты, и он висит там до попадания —
+        -- именно из-за этого провалившиеся прессы холдов вообще не добирались.
+        local function verify(attempt: number)
             task.spawn(function()
                 local confirmed = false
-                local frame: Instance? = nil
-                for _ = 1, 8 do
+                for _ = 1, 4 do
                     RunService.Heartbeat:Wait()
-                    frame = findHoldFrame(ar, note.Name)
-                    if not note.Parent then confirmed = true end
-                    if confirmed or (frame and frame.Parent) then break end
-                end
-
-                if frame and frame.Parent then
-                    hits = hits + 1
-                    startHold(lane, note.Name, ks)
-                    return
+                    if not note.Parent then
+                        confirmed = true
+                        break
+                    end
                 end
 
                 if confirmed then
                     hits = hits + 1
-                    -- обычная нота: сразу отпускаем, чтобы не блокировать следующую
-                    if not held[lane] then releaseKey(lane) end
+                    if findHoldInHitbox(ar, note.Name) then
+                        startHold(lane, note.Name, ks)
+                    else
+                        releaseKey(lane)
+                    end
                     return
                 end
 
-                -- Нажатие не засчитано: нота ещё жива. Если она всё ещё в окне —
-                -- ждём до sweetSpot и жмём повторно (промах не штрафуется).
+                -- Не засчиталось. Сначала отпускаем клавишу: повторный keydown по уже
+                -- зажатой клавише игра просто не видит. Потом жмём ещё раз, но только
+                -- пока нота внутри окна (off <= 110), иначе повтор уйдёт в "M"-мисс.
+                releaseKey(lane)
                 local off = offsetMs(note)
-                if not retried and off <= 140 then
-                    local waitMore = math.clamp((off - st.target) / 1000, 0, 0.25)
+                if attempt < 2 and off <= 110 then
+                    local waitMore = math.clamp((off - st.target) / 1000, 0, 0.1)
                     if waitMore > 0 then task.wait(waitMore) end
+                    RunService.Heartbeat:Wait()
                     if not note.Parent then return end
                     doPress()
-                    verify(true)
+                    verify(attempt + 1)
                     return
                 end
 
@@ -432,7 +461,7 @@ local function pressNote(lane: number, note: Instance, ar: Instance, ks: Instanc
         end
 
         doPress()
-        verify(false)
+        verify(0)
     end)
 end
 
