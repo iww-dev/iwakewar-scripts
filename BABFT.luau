@@ -1,112 +1,93 @@
--- BABFT autofarm by iwakewar team (WindUI port)
+-- BABFT autofarm by iwakewar team (Primordial UI)
+-- GUI: gui-lib/PrimordialUI.luau
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 local cfg = { farm = false, speed = 461, mode = "Old (fastest)", yOffset = 0 }
 
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau"
 
-local Window = WindUI:CreateWindow({
-    Title = "BABFT Farm",
-    Folder = "iwakewar-babft",
-    Icon = "boat",
-    Theme = "Rose",
-    Size = isPhone and UDim2.fromOffset(507, 325) or UDim2.fromOffset(780, 500),
-    Position = isPhone and UDim2.new(0, 9, 1, -334) or UDim2.new(0, 7, 1, -507),
-    Topbar = { Height = 40, ButtonsType = "Default" },
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = true,
-        Scale = isPhone and 1.1 or 0.5,
-        CornerRadius = UDim.new(0, 6),
-    },
-})
-
-local lang = "ru"
-local function LT(ru, uk, en)
-  if lang == "en" then return en or ru end
-  if lang == "uk" then return uk or ru end
-  return ru
+local genv0 = getgenv()
+if genv0.__babftUI and type(genv0.__babftUI.Destroy) == "function" then
+    pcall(function() genv0.__babftUI:Destroy() end)
 end
 
+local GUI = loadstring(game:HttpGet(LIB_URL))()
+genv0.__babftUI = GUI
+
+local Window = GUI:CreateWindow({
+    Title = "BABFT Farm",
+    Subtitle = "by iwakewar team",
+    Size = isPhone and UDim2.fromOffset(507, 325) or UDim2.fromOffset(780, 500),
+    ToggleKey = Enum.KeyCode.LeftAlt,
+})
+
 local Tabs = {
-    Info = Window:Tab({ Title = LT("Инфо", "Інфо", "Info"), Icon = "sfsymbols:info.circle", Border = true }),
-    Main = Window:Tab({ Title = LT("Главная", "Головна", "Main"), Icon = "sfsymbols:house", Border = true }),
-    Settings = Window:Tab({ Title = LT("Настройки", "Налаштування", "Settings"), Icon = "sfsymbols:gear", Border = true }),
+    Info = Window:Tab({ Title = "Info", Subtitle = "About the script" }),
+    Farm = Window:Tab({ Title = "Farm", Subtitle = "Automation and flight" }),
+    Rates = Window:Tab({ Title = "Rates", Subtitle = "Gold per minute" }),
 }
+Window:SelectTab(1)
 
-Tabs.Settings:Dropdown({
-    Title = "Language / Язык / Мова",
-    Values = { "Русский", "Українська", "English" },
-    Value = "Русский",
-    Callback = function(v)
-        if v == "English" then lang = "en"
-        elseif v == "Українська" then lang = "uk"
-        else lang = "ru" end
-        WindUI:Notify({ Title = "BABFT Farm", Content = "Language changed", Duration = 2 })
-    end,
-})
-
-Tabs.Settings:Dropdown({
-    Title = LT("Тема", "Тема", "Theme"),
-    Values = { "Rose", "Dark", "Mellowsi" },
-    Value = "Rose",
-    Callback = function(v)
-        pcall(function() Window:SetTheme(v) end)
-        pcall(function() WindUI:SetTheme(v) end)
-        WindUI:Notify({ Title = "BABFT Farm", Content = "Theme: " .. v, Duration = 2 })
-    end,
-})
-
+-- Info ------------------------------------------------------------------
+Tabs.Info:Section({ Title = "About" })
 Tabs.Info:Paragraph({
     Title = "BABFT Farm",
-    Desc = "Autofarm for Build A Boat For Treasure\nby iwakewar team",
+    Content = "Autofarm for Build A Boat For Treasure\nby iwakewar team\n\nLaunch your boat, ride the stage line, open the golden chest, respawn.",
 })
-
 Tabs.Info:Button({
-    Title = LT("Наш Discord сервер", "Наш Discord сервер", "Our Discord Server"),
-    Desc = "Copy invite link to clipboard",
+    Title = "Our Discord Server",
+    Description = "Copy invite link to clipboard",
     Callback = function()
         pcall(setclipboard, "https://discord.gg/GgshjzxxFS")
-        WindUI:Notify({ Title = "BABFT Farm", Content = "Discord link copied", Duration = 3 })
+        GUI:Notify({
+            Title = "BABFT Farm",
+            Content = "Discord link copied",
+            Type = "success",
+            Duration = 3,
+        })
     end,
 })
 
-local farmTog = Tabs.Main:Toggle({
-    Title = LT("Фарм", "Фарм", "Farm"),
-    Desc = "Launch -> fly -> chest -> reset",
-    Value = false,
+-- Farm ------------------------------------------------------------------
+Tabs.Farm:Section({ Title = "Automation" })
+local farmTog = Tabs.Farm:Toggle({
+    Title = "Farm",
+    Description = "Launch -> fly -> chest -> reset",
+    Default = false,
     Callback = function(v) cfg.farm = v end,
 })
 
-local ratePara = Tabs.Main:Paragraph({ Title = LT("Голда за 15 минут", "Золото за 15 хвилин", "Gold per 15 minutes"), Desc = "-" })
-local ratePara75 = Tabs.Main:Paragraph({ Title = LT("Голда за 75 секунд", "Золото за 75 секунд", "Gold per 75 seconds"), Desc = "-" })
-local ratePara120 = Tabs.Main:Paragraph({ Title = LT("Голда за 2 минуты", "Золото за 2 хвилини", "Gold per 2 min"), Desc = "-" })
-
-local speedSld = Tabs.Main:Slider({
-    Title = LT("Скорость полёта", "Швидкість польоту", "Fly speed"),
-    Desc = "Studs per second",
-    Step = 1,
-    Value = { Min = 20, Max = 461, Default = 461 },
+Tabs.Farm:Section({ Title = "Flight" })
+local speedSld = Tabs.Farm:Slider({
+    Title = "Fly speed",
+    Description = "Studs per second",
+    Min = 20,
+    Max = 461,
+    Value = 461,
+    Format = "%.0f",
     Callback = function(v) cfg.speed = v end,
 })
-
-Tabs.Main:Dropdown({
-    Title = LT("Режим", "Режим", "Mode"),
-    Values = { "New", "Old (fastest)" },
+local modeDrop = Tabs.Farm:Dropdown({
+    Title = "Mode",
+    Description = "New is slower but safer, Old is the fastest route",
+    Values = { "Old (fastest)", "New" },
     Value = "Old (fastest)",
     Callback = function(v)
         cfg.mode = v
         cfg.yOffset = (v == "Old (fastest)") and -9.5 or 0
-        WindUI:Notify({ Title = "BABFT Farm", Content = "Mode: " .. v, Duration = 2 })
     end,
 })
 
--- ===== core farm logic (unchanged) =====
+-- Rates -----------------------------------------------------------------
+Tabs.Rates:Section({ Title = "Gold" })
+local ratePara = Tabs.Rates:Paragraph({ Title = "Gold / 15 min", Content = "-" })
+local ratePara75 = Tabs.Rates:Paragraph({ Title = "Gold / 75 s", Content = "-" })
+local ratePara120 = Tabs.Rates:Paragraph({ Title = "Gold / 2 min", Content = "-" })
+
+-- ===== core farm logic =====
 local genv = getgenv()
 genv.__babftGen = (genv.__babftGen or 0) + 1
 local myGen = genv.__babftGen
@@ -203,9 +184,9 @@ task.spawn(function()
                 end
             end
             hist = fresh
-            pcall(function() ratePara:SetDesc(tostring(sum15) .. " gold / 15 min (now: " .. g .. ")") end)
-            pcall(function() ratePara75:SetDesc(tostring(sum75) .. " gold / 75 s (now: " .. g .. ")") end)
-            pcall(function() ratePara120:SetDesc(tostring(sum120) .. " gold / 2 min (now: " .. g .. ")") end)
+            pcall(function() ratePara:SetContent(tostring(sum15) .. " gold (now: " .. g .. ")") end)
+            pcall(function() ratePara75:SetContent(tostring(sum75) .. " gold (now: " .. g .. ")") end)
+            pcall(function() ratePara120:SetContent(tostring(sum120) .. " gold (now: " .. g .. ")") end)
         end
         local h = hrp()
         local p = h and h.Position or nil
@@ -244,7 +225,7 @@ game:GetService("RunService").Heartbeat:Connect(function()
 end)
 
 task.spawn(function()
-    print("[BABFT] ready (WindUI)")
+    print("[BABFT] ready (Primordial UI)")
     while alive() do
         if cfg.farm then
             local wt0 = os.clock()
@@ -293,9 +274,9 @@ task.spawn(function()
                 if cfg.mode == "Old (fastest)" and alive() and cfg.farm then
                     local h2 = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
                     if h2 then
-    local okL = pcall(function() LP:LoadCharacter() end)
-    if not okL then pcall(function() h2.Health = 0 end) end
-end
+                        local okL = pcall(function() LP:LoadCharacter() end)
+                        if not okL then pcall(function() h2.Health = 0 end) end
+                    end
                     task.wait(2)
                 end
                 if alive() and cfg.farm and cfg.mode ~= "Old (fastest)" then
@@ -316,9 +297,9 @@ end
                     if hend and cdist < 40 then
                         local h2 = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
                         if h2 then
-    local okL = pcall(function() LP:LoadCharacter() end)
-    if not okL then pcall(function() h2.Health = 0 end) end
-end
+                            local okL = pcall(function() LP:LoadCharacter() end)
+                            if not okL then pcall(function() h2.Health = 0 end) end
+                        end
                         local wt = os.clock()
                         while alive() and cfg.farm and hrp() ~= nil and os.clock() - wt < 3 do task.wait(0.2) end
                         wt = os.clock()
@@ -346,21 +327,4 @@ end
     end
 end)
 
-print("[BABFT-WindUI] loaded")
-pcall(function() Window:SetToggleKey(Enum.KeyCode.LeftAlt) end)
-
-pcall(function() Window:SetPosition(isPhone and UDim2.new(0, 9, 1, -334) or UDim2.new(0, 7, 1, -507)) end)
-pcall(function() Window:SelectTab(1) end)
-
--- ===== console mirror to localhost =====
-do
-    local _print = print
-    local _warn = warn
-    local sockRef
-    -- hook ws connect to store socket
-    task.spawn(function()
-        -- wait for socket variable? We'll re-connect tracking below
-    end)
-end
-
--- (websocket debug removed)
+print("[BABFT] loaded (Primordial UI)")

@@ -194,6 +194,21 @@ local function tween(o, time, props)
     TweenService:Create(o, TweenInfo.new(time or 0.12, Enum.EasingStyle.Quad), props):Play()
 end
 
+-- короткая вспышка при нажатии по карточке-кнопке
+local function pressFlash(obj)
+    if not obj then return end
+    pcall(function()
+        TweenService:Create(obj, TweenInfo.new(0.07, Enum.EasingStyle.Quad), { BackgroundTransparency = 0.45 }):Play()
+    end)
+    task.delay(0.08, function()
+        if obj and obj.Parent then
+            pcall(function()
+                TweenService:Create(obj, TweenInfo.new(0.18, Enum.EasingStyle.Quad), { BackgroundTransparency = 0 }):Play()
+            end)
+        end
+    end)
+end
+
 -- ======================================================================
 -- gradients / depth helpers
 -- ======================================================================
@@ -418,7 +433,8 @@ function Lib:CreateWindow(cfg)
         BackgroundColor3 = P.bg,
         BorderSizePixel = 0,
         Size = UDim2.fromOffset(winW, winH),
-        Position = UDim2.new(0.5, -winW / 2, 0.5, -winH / 2),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
         Visible = cfg.Open ~= false,
         ZIndex = 2,
     }, gui)
@@ -445,6 +461,37 @@ function Lib:CreateWindow(cfg)
     hgrad(rootRim, Color3.new(1, 1, 1), Color3.new(1, 1, 1), numberSeq({
         { 0, 1 }, { 0.1, 0.9 }, { 0.5, 0.84 }, { 0.9, 0.9 }, { 1, 1 },
     }))
+
+    -- анимация окна: при показе «разворот» из 94% + проявление,
+    -- при скрытии наоборот. так открытие/закрытие не дёргается
+    local winWFull, winHFull = winW, winH
+    local hideToken = 0
+
+    local function windowShown()
+        hideToken = hideToken + 1
+        root.Visible = true
+        local targetH = W.Minimized and 42 or winHFull
+        root.Size = UDim2.fromOffset(math.floor(winWFull * 0.94), math.floor(targetH * 0.94))
+        pcall(function()
+            TweenService:Create(root, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(winWFull, targetH),
+            }):Play()
+        end)
+    end
+
+    local function windowHidden()
+        hideToken = hideToken + 1
+        local token = hideToken
+        local fromH = W.Minimized and 42 or winHFull
+        tween(root, 0.14, { Size = UDim2.fromOffset(math.floor(winWFull * 0.94), math.floor(fromH * 0.94)) })
+        task.delay(0.16, function()
+            if token ~= hideToken or not root.Parent then return end
+            root.Visible = false
+        end)
+    end
+
+    W.ShowWindow, W.HideWindow = windowShown, windowHidden
+    if cfg.Open ~= false then windowShown() end
 
     -- top bar -----------------------------------------------------------
     local top = new("Frame", {
@@ -551,7 +598,7 @@ function Lib:CreateWindow(cfg)
         }, parent)
     end
 
-    local closeBtn = topBtn(-38, P.sub, function() root.Visible = false end)
+    local closeBtn = topBtn(-38, P.sub, function() windowHidden() end)
     local closeIcon = drawCross(closeBtn, 9, P.sub, 1.5)
     local function tintIcon(holder, color)
         for _, line in ipairs(holder:GetChildren()) do
@@ -563,8 +610,19 @@ function Lib:CreateWindow(cfg)
 
     local minBtn = topBtn(-72, P.sub, function()
         W.Minimized = not W.Minimized
-        W.Body.Visible = not W.Minimized
-        root.Size = W.Minimized and UDim2.fromOffset(root.AbsoluteSize.X, 42) or UDim2.fromOffset(winW, winH)
+        if W.Minimized then
+            W.Body.Visible = false
+            if W.Footer then W.Footer.Visible = false end
+            tween(root, 0.2, { Size = UDim2.fromOffset(winWFull, 42) })
+        else
+            tween(root, 0.22, { Size = UDim2.fromOffset(winWFull, winHFull) })
+            task.delay(0.05, function()
+                if not W.Minimized then
+                    W.Body.Visible = true
+                    if W.Footer then W.Footer.Visible = true end
+                end
+            end)
+        end
     end)
     local minIcon = new("Frame", {
         BackgroundTransparency = 1,
@@ -654,6 +712,7 @@ function Lib:CreateWindow(cfg)
         Position = UDim2.new(0, 0, 1, -32),
     }, root)
     vgrad(footer, P.chromeBottom, P.chromeTop)
+    W.Footer = footer
     local footLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
@@ -1299,6 +1358,12 @@ function Lib:CreateWindow(cfg)
             applyFont(other.NameLabel, active and W_MED or W_REG)
         end
         W.Active = tab
+        -- новая страница «доезжает» снизу, а не появляется рывком
+        if tab and tab.Page then
+            tab.Page.Position = UDim2.fromOffset(0, 8)
+            pcall(function() tween(tab.Page, 0.2, { Position = UDim2.fromOffset(0, 0) }) end)
+            if tab.Scroll then pcall(function() tween(tab.Scroll, 0.2, { CanvasPosition = Vector2.new(0, 0) }) end) end
+        end
     end
 
     function WindowProto:Tab(opts)
@@ -1382,7 +1447,9 @@ function Lib:CreateWindow(cfg)
 
         tab.BtnBg, tab.Bar, tab.NameLabel, tab.DescLabel = btnBg, bar, nameLabel, descLabel
         tab.BtnStroke, tab.ActiveTint, tab.BarGlow = btnStroke, activeTint, barGlow
-        tab.btn = setmetatable({ Text = tab.Title }, {
+        -- пустая таблица, а не {Text = ...}: иначе ключ Text уже лежит в таблице
+        -- и __newindex никогда не срабатывает — переименование вкладки не работает
+        tab.btn = setmetatable({}, {
             __index = function(_, k)
                 if k == "Text" then return nameLabel.Text end
                 return tab[k]
@@ -1391,6 +1458,7 @@ function Lib:CreateWindow(cfg)
                 if k == "Text" then
                     nameLabel.Text = tostring(v)
                     tab.Title = tostring(v)
+                    if tab.DefaultChip then tab.DefaultChip.Text = tostring(v) end
                 else
                     tab[k] = v
                 end
@@ -1738,6 +1806,8 @@ function Lib:CreateWindow(cfg)
             showPopup(box, values, api.Value, function(picked)
                 api.Value = picked
                 valueLbl.Text = tostring(picked)
+                valueLbl.TextTransparency = 1
+                tween(valueLbl, 0.16, { TextTransparency = 0 })
                 if opts.Callback then task.spawn(opts.Callback, picked) end
             end)
         end)
@@ -1908,6 +1978,7 @@ function Lib:CreateWindow(cfg)
             arrowLbl.TextColor3 = P.sub
         end)
         card.MouseButton1Click:Connect(function()
+            pressFlash(card)
             if opts.Callback then task.spawn(opts.Callback) end
         end)
 
@@ -1941,11 +2012,11 @@ function Lib:CreateWindow(cfg)
     end
 
     function WindowProto:Toggle()
-        root.Visible = not root.Visible
+        if root.Visible then windowHidden() else windowShown() end
     end
 
-    function WindowProto:Show() root.Visible = true end
-    function WindowProto:Hide() root.Visible = false end
+    function WindowProto:Show() windowShown() end
+    function WindowProto:Hide() windowHidden() end
     function WindowProto:IsOpen() return root.Visible end
 
     function WindowProto:Destroy()
@@ -1961,7 +2032,7 @@ function Lib:CreateWindow(cfg)
         if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
         if processed then return end
         if W.ToggleKey and input.KeyCode == W.ToggleKey then
-            root.Visible = not root.Visible
+            if root.Visible then windowHidden() else windowShown() end
         elseif input.KeyCode == Enum.KeyCode.Escape and root.Visible then
             closePopup()
         end
