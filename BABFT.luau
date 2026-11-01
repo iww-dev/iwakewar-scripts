@@ -170,6 +170,28 @@ local function waitRespawn(limit)
     return false
 end
 
+-- труп ещё какое-то время остаётся в workspace, и hrp() возвращает его.
+-- летать трупом нельзя: он висит ниже карты, а респавн уже идёт.
+local function liveHum()
+    local c = LP.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not (h and r) then return nil end
+    if h.Health <= 0 then return nil end
+    return h, r
+end
+
+-- дождаться живого персонажа (после ресета), не дольше limit секунд
+local function waitAlive(limit)
+    local t0 = os.clock()
+    while alive() and cfg.farm and os.clock() - t0 < (limit or 10) do
+        local h, r = liveHum()
+        if h and r and h.Health >= 100 then return true end
+        task.wait(0.05)
+    end
+    return false
+end
+
 -- ===== anti-afk =====
 -- Сервер кикает за ~20 минут без ввода. Держим idle-таймер на нуле:
 -- VirtualUser:CaptureController + ClickButton2 — тот же приём, что в штатном
@@ -253,15 +275,28 @@ local function flyTo(target, speed)
     local done = false
     conn = game:GetService("RunService").Heartbeat:Connect(function(dt)
         if not alive() or not cfg.farm then done = true return end
-        local hh = hrp()
-        if not hh then done = true return end
+        -- труп/мёртвый персонаж: не таскаем его по карте
+        local hum, hh = liveHum()
+        if not hh then hh = hrp() end
+        if not hh or (hum and hum.Health <= 0) then done = true return end
         noclipOn()
         local d = target - hh.Position
         if d.Magnitude < 8 then done = true return end
         hh.AssemblyLinearVelocity = Vector3.zero
         hh.AssemblyAngularVelocity = Vector3.zero
-        local step = d.Unit * math.min(speed * math.min(dt, 0.05), d.Magnitude)
-        hh.CFrame = CFrame.lookAt(hh.Position + step, hh.Position + step + d.Unit)
+        -- Раньше шаг был строго по прямой к цели: вертикальная доля там крошечная,
+        -- и гравитация съедала её за тот же кадр — персонаж летел по низу.
+        -- Теперь горизонталь и высота догоняются независимо.
+        local maxStep = speed * math.min(dt, 0.05)
+        local flat = Vector3.new(d.X, 0, d.Z)
+        local horiz = flat.Magnitude > 1e-3 and flat.Unit or Vector3.zero
+        local yStep = math.clamp(d.Y, -maxStep, maxStep)
+        local step = horiz * math.min(maxStep, flat.Magnitude) + Vector3.new(0, yStep, 0)
+        local look = horiz.Magnitude > 0 and horiz or Vector3.new(0, 0, 1)
+        local torso = hh.Position + step
+        -- при почти вертикальном движении lookAt с up=(0,1,0) вырождается
+        local up = math.abs(look.Y) > 0.99 and Vector3.new(1, 0, 0) or Vector3.new(0, 1, 0)
+        hh.CFrame = CFrame.lookAt(torso, torso + look, up)
         if os.clock() - t0 > (fastMode() and 60 or 180) then done = true end
     end)
     local waitStep = fastMode() and 0.03 or 0.1
@@ -362,7 +397,9 @@ task.spawn(function()
             local waitStep = fastMode() and 0.1 or 0.5
             local waitMax = fastMode() and 3 or 15
             while alive() and cfg.farm and hrp() == nil and os.clock() - wt0 < waitMax do task.wait(waitStep) end
-            if hrp() ~= nil then
+            -- ждём именно живого персонажа: hrp() отдаёт и труп
+            if os.clock() - wt0 >= waitMax then waitAlive(2) end
+            if liveHum() then
                 local z = nil
                 pcall(function()
                     for _, zz in ipairs(workspace:GetChildren()) do
@@ -415,6 +452,9 @@ task.spawn(function()
                         waitRespawn()
                     else
                         task.wait(2)
+                        -- 2 с не всегда хватает: сервер может ещё держать труп,
+                        -- и цикл улетал трупом вместо нового персонажа
+                        waitAlive(6)
                     end
                 end
                 if alive() and cfg.farm and not fastMode() then
