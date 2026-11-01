@@ -5,7 +5,21 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
-local cfg = { farm = false, speed = 461, mode = "Old (fastest)", yOffset = 0 }
+local cfg = {
+    farm = false, speed = 461, mode = "Old (fastest)", yOffset = 0,
+    antiAfk = true,          -- по умолчанию включён
+    afkSpace = 600,          -- пробел раз в 10 минут
+    idleReset = 5,           -- как часто обнулять idle-таймер, сек
+}
+
+-- Experimental — это Old, но на один вейпоинт дальше и с ресетом без паузы.
+-- Поэтому «быстрый» профиль общий у Old и Experimental.
+local function fastMode()
+    return cfg.mode ~= "New"
+end
+local function isExperimental()
+    return cfg.mode == "Experimental"
+end
 
 local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau"
 
@@ -28,6 +42,7 @@ local Tabs = {
     Info = Window:Tab({ Title = "Info", Subtitle = "About the script" }),
     Farm = Window:Tab({ Title = "Farm", Subtitle = "Automation and flight" }),
     Rates = Window:Tab({ Title = "Rates", Subtitle = "Gold per minute" }),
+    Misc = Window:Tab({ Title = "Misc", Subtitle = "Utility" }),
 }
 Window:SelectTab(1)
 
@@ -60,7 +75,7 @@ local farmTog = Tabs.Farm:Toggle({
     Callback = function(v) cfg.farm = v end,
 })
 
-Tabs.Farm:Section({ Title = "Flight" })
+Tabs.Farm:Section({ Title = "Settings" })
 local speedSld = Tabs.Farm:Slider({
     Title = "Fly speed",
     Description = "Studs per second",
@@ -72,12 +87,12 @@ local speedSld = Tabs.Farm:Slider({
 })
 local modeDrop = Tabs.Farm:Dropdown({
     Title = "Mode",
-    Description = "New is slower but safer, Old is the fastest route",
-    Values = { "Old (fastest)", "New" },
+    Description = "New is slower but safer, Old is the fastest route, Experimental goes one waypoint further",
+    Values = { "Old (fastest)", "Experimental", "New" },
     Value = "Old (fastest)",
     Callback = function(v)
         cfg.mode = v
-        cfg.yOffset = (v == "Old (fastest)") and -9.5 or 0
+        cfg.yOffset = (v == "New") and 0 or -9.5
     end,
 })
 
@@ -86,6 +101,39 @@ Tabs.Rates:Section({ Title = "Gold" })
 local ratePara = Tabs.Rates:Paragraph({ Title = "Gold / 15 min", Content = "-" })
 local ratePara75 = Tabs.Rates:Paragraph({ Title = "Gold / 75 s", Content = "-" })
 local ratePara120 = Tabs.Rates:Paragraph({ Title = "Gold / 2 min", Content = "-" })
+
+-- Misc -------------------------------------------------------------------
+Tabs.Misc:Section({ Title = "Anti-AFK" })
+local antiTog = Tabs.Misc:Toggle({
+    Title = "Anti-AFK",
+    Description = "Holds the idle timer at 0 so the server never kicks you",
+    Default = true,
+    Callback = function(v) cfg.antiAfk = v end,
+})
+local idleDrop = Tabs.Misc:Dropdown({
+    Title = "Idle reset",
+    Description = "How often the idle timer is zeroed",
+    Values = { "2 s", "5 s", "10 s", "30 s" },
+    Value = "5 s",
+    Callback = function(v) cfg.idleReset = tonumber(v:sub(1, -3)) or 5 end,
+})
+local spaceDrop = Tabs.Misc:Dropdown({
+    Title = "Space tap",
+    Description = "Extra Space press on top of the idle reset",
+    Values = { "5 min", "10 min", "20 min", "30 min", "Off" },
+    Value = "10 min",
+    Callback = function(v)
+        if v == "Off" then
+            cfg.afkSpace = 0
+        else
+            cfg.afkSpace = (tonumber(v:sub(1, -5)) or 10) * 60
+        end
+    end,
+})
+local afkPara = Tabs.Misc:Paragraph({
+    Title = "Anti-AFK status",
+    Content = "on | idle reset: 0 s | space taps: 0",
+})
 
 -- ===== core farm logic =====
 local genv = getgenv()
@@ -101,9 +149,91 @@ local function alive()
     return true
 end
 
+-- ждём только респавн: health падает до 0 и возвращается к 100.
+-- если LoadCharacter отработал мгновенно и нуля мы не увидели — не висим,
+-- считаем живым, как только health снова 100.
+local function waitRespawn(limit)
+    limit = limit or 30
+    local t0 = os.clock()
+    local sawZero = false
+    while alive() and cfg.farm and os.clock() - t0 < limit do
+        local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+        if not h then
+            sawZero = true
+        elseif h.Health <= 0 then
+            sawZero = true
+        elseif h.Health >= 100 and (sawZero or os.clock() - t0 > 0.5) then
+            return true
+        end
+        task.wait(0.05)
+    end
+    return false
+end
+
+-- ===== anti-afk =====
+-- Сервер кикает за ~20 минут без ввода. Держим idle-таймер на нуле:
+-- VirtualUser:CaptureController + ClickButton2 — тот же приём, что в штатном
+-- обработчике Idled, только повторяем его по кругу.
+local VirtualUser = game:GetService("VirtualUser")
+local VIM = game:GetService("VirtualInputManager")
+local afk = { resets = 0, taps = 0, lastReset = os.clock(), lastTap = os.clock() }
+
+local function resetIdle()
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+    afk.resets = afk.resets + 1
+    afk.lastReset = os.clock()
+end
+
+local function tapSpace()
+    pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game) end)
+    task.delay(0.1, function()
+        pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game) end)
+    end)
+    afk.taps = afk.taps + 1
+    afk.lastTap = os.clock()
+end
+
+-- страховка: если клиент всё-таки решил, что мы афк, гасим это до дисконнекта
+if genv0.__babftIdled then pcall(function() genv0.__babftIdled:Disconnect() end) end
+genv0.__babftIdled = LP.Idled:Connect(function()
+    if not cfg.antiAfk then return end
+    if not alive() then return end
+    resetIdle()
+end)
+
+task.spawn(function()
+    local lastUi = 0
+    while alive() do
+        if cfg.antiAfk then
+            local gap = cfg.idleReset or 5
+            if os.clock() - afk.lastReset >= gap then resetIdle() end
+            if (cfg.afkSpace or 0) > 0 and os.clock() - afk.lastTap >= cfg.afkSpace then
+                -- во время фарма персонаж и так в движении, прыжок может сбить маршрут
+                if not cfg.farm then tapSpace() else afk.lastTap = os.clock() end
+            end
+        else
+            afk.lastTap = os.clock()
+        end
+        if os.clock() - lastUi >= 5 then
+            lastUi = os.clock()
+            local line
+            if cfg.antiAfk then
+                line = string.format("on | idle reset: %ds ago (x%d) | space taps: %d",
+                    math.floor(os.clock() - afk.lastReset), afk.resets, afk.taps)
+            else
+                line = string.format("off | idle reset paused (x%d) | space taps: %d", afk.resets, afk.taps)
+            end
+            pcall(function() afkPara:SetContent(line) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
 local WAYPOINTS = {
-    Vector3.new(-54, 27, 1108), Vector3.new(-54, 27, 1368), Vector3.new(-54, 27, 2138),
-    Vector3.new(-54, 27, 2908), Vector3.new(-54, 27, 3678), Vector3.new(-54, 27, 4448),
+    Vector3.new(-54, 27, 1108), Vector3.new(-54, 27, 1368), Vector3.new(-54, 27, 2138), Vector3.new(-54, 27, 2908), Vector3.new(-54, 27, 3678), Vector3.new(-54, 27, 4448),
     Vector3.new(-54, 27, 5218), Vector3.new(-54, 27, 5988), Vector3.new(-54, 27, 6758),
     Vector3.new(-54, 27, 7528), Vector3.new(-54, 27, 8298), Vector3.new(-54, 9, 8447),
 }
@@ -132,9 +262,9 @@ local function flyTo(target, speed)
         hh.AssemblyAngularVelocity = Vector3.zero
         local step = d.Unit * math.min(speed * math.min(dt, 0.05), d.Magnitude)
         hh.CFrame = CFrame.lookAt(hh.Position + step, hh.Position + step + d.Unit)
-        if os.clock() - t0 > (cfg.mode == "Old (fastest)" and 60 or 180) then done = true end
+        if os.clock() - t0 > (fastMode() and 60 or 180) then done = true end
     end)
-    local waitStep = (cfg.mode == "Old (fastest)") and 0.03 or 0.1
+    local waitStep = fastMode() and 0.03 or 0.1
     while not done and alive() and cfg.farm do task.wait(waitStep) end
     pcall(function() conn:Disconnect() end)
     return done
@@ -229,8 +359,8 @@ task.spawn(function()
     while alive() do
         if cfg.farm then
             local wt0 = os.clock()
-            local waitStep = (cfg.mode == "Old (fastest)") and 0.1 or 0.5
-            local waitMax = (cfg.mode == "Old (fastest)") and 3 or 15
+            local waitStep = fastMode() and 0.1 or 0.5
+            local waitMax = fastMode() and 3 or 15
             while alive() and cfg.farm and hrp() == nil and os.clock() - wt0 < waitMax do task.wait(waitStep) end
             if hrp() ~= nil then
                 local z = nil
@@ -246,15 +376,18 @@ task.spawn(function()
                     if not alive() or not cfg.farm then break end
                     if z and z.Launched.Value then break end
                     doLaunch()
-                    if cfg.mode ~= "Old (fastest)" then task.wait(0.2) end
+                    if not fastMode() then task.wait(0.2) end
                 end
-                if cfg.mode ~= "Old (fastest)" then flyTo(Vector3.new(-54, 27, 300), cfg.speed) end
+                if not fastMode() then flyTo(Vector3.new(-54, 27, 300), cfg.speed) end
                 local stageT0 = nil
+                -- Old останавливается за два вейпоинта до конца, Experimental
+                -- проходит ещё один
+                local stopAt = isExperimental() and #WAYPOINTS or (#WAYPOINTS - 1)
                 for i, wp in ipairs(WAYPOINTS) do
                     if not alive() or not cfg.farm then break end
-                    if cfg.mode == "Old (fastest)" and i >= #WAYPOINTS - 1 then break end
+                    if fastMode() and i >= stopAt then break end
                     local sp = cfg.speed
-                    if cfg.mode == "Old (fastest)" then
+                    if fastMode() then
                         if i >= #WAYPOINTS - 2 then
                             sp = 555
                         elseif i <= 2 then
@@ -271,20 +404,25 @@ task.spawn(function()
                     elseif i >= #WAYPOINTS - 1 then task.wait(0.17 * (0.603 ^ (#WAYPOINTS - i)))
                     else task.wait(0.17 * (0.914 ^ (i - 4))) end
                 end
-                if cfg.mode == "Old (fastest)" and alive() and cfg.farm then
+                if fastMode() and alive() and cfg.farm then
                     local h2 = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
                     if h2 then
                         local okL = pcall(function() LP:LoadCharacter() end)
                         if not okL then pcall(function() h2.Health = 0 end) end
                     end
-                    task.wait(2)
+                    if isExperimental() then
+                        -- Experimental не ждёт фиксированную паузу: только респавн
+                        waitRespawn()
+                    else
+                        task.wait(2)
+                    end
                 end
-                if alive() and cfg.farm and cfg.mode ~= "Old (fastest)" then
+                if alive() and cfg.farm and not fastMode() then
                     flyTo(Vector3.new(-55.7, 9, 9492), cfg.speed)
                     flyTo(CHEST, cfg.speed * 1.5)
                     local g0 = gold()
                     local t1 = os.clock()
-                    while alive() and cfg.farm and os.clock() - t1 < (cfg.mode == "Old (fastest)" and 0.1 or 8) do
+                    while alive() and cfg.farm and os.clock() - t1 < (fastMode() and 0.1 or 8) do
                         local hh = hrp()
                         if hh then hh.CFrame = CFrame.new(CHEST + Vector3.new(0, math.sin(os.clock() * 6) * 2, 0)) end
                         local g1 = gold()
@@ -304,7 +442,7 @@ task.spawn(function()
                         while alive() and cfg.farm and hrp() ~= nil and os.clock() - wt < 3 do task.wait(0.2) end
                         wt = os.clock()
                         while alive() and cfg.farm and hrp() == nil and os.clock() - wt < 15 do task.wait(0.5) end
-                        if cfg.mode == "Old (fastest)" then task.wait(0) else task.wait(1.7) end
+                        if fastMode() then task.wait(0) else task.wait(1.7) end
                         local hn = hrp()
                         local spawn = Vector3.new(470, -10, -25)
                         pcall(function()
@@ -316,7 +454,7 @@ task.spawn(function()
                         hn = hrp()
                         if hn and (hn.Position - spawn).Magnitude > 200 then
                             hn.CFrame = CFrame.new(spawn)
-                            if cfg.mode == "Old (fastest)" then task.wait(0.2) else task.wait(1) end
+                            if fastMode() then task.wait(0.2) else task.wait(1) end
                         end
                     end
                 end
