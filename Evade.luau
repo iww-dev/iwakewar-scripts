@@ -24,6 +24,8 @@ genv0.__evadeFluent = GUI -- старый хендл, чтобы не слома
 local Window = GUI:CreateWindow({
   Title = "Evade Helper",
   Subtitle = "by iwakewar team",
+  Footer = "by iwakewar team",
+  Version = "v2.0.0 (2.0 P0, fullver 2.0.0)",
   Size = UDim2.fromOffset(780, 500),
   ToggleKey = Enum.KeyCode.LeftAlt,
 })

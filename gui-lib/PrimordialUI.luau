@@ -347,7 +347,7 @@ local Lib = {}
 Lib.__index = Lib
 Lib.Unloaded = false
 Lib.Options = {}
-Lib.Version = "1.1.0"
+Lib.Version = "2.0.0"
 Lib.Brand = "Primordial UI"
 Lib.LoaderBrand = "Primordial Loader"
 Lib.Lang = "ru"
@@ -373,6 +373,9 @@ function Lib:Destroy()
     Lib.Unloaded = true
     if Lib.__window then
         pcall(function() Lib.__window:Destroy() end)
+    end
+    if Lib.__loader then
+        pcall(function() Lib.__loader:Destroy() end)
     end
     if Lib.GUI then
         pcall(function() Lib.GUI:Destroy() end)
@@ -2059,6 +2062,9 @@ end
 -- ======================================================================
 function Lib:Loader(cfg)
     cfg = cfg or {}
+    -- предыдущий лоадер убираем, чтобы не плодить оверлеи
+    if Lib.__loader then pcall(function() Lib.__loader:Destroy() end) end
+
     local plr = game:GetService("Players").LocalPlayer
     local hasConsole = cfg.Console ~= false
 
@@ -2084,7 +2090,7 @@ function Lib:Loader(cfg)
         Name = "Loader",
         BackgroundColor3 = P.bg,
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(winW, winH),
+        Size = UDim2.fromOffset(math.floor(winW * 0.94), math.floor(winH * 0.94)),
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
     }, gui)
@@ -2096,6 +2102,13 @@ function Lib:Loader(cfg)
         Color3.fromRGB(46, 46, 50),
         numberSeq({ { 0, 0.08 }, { 1, 0.6 } }))
     rimLight(win, 1, 0.92, 1, 3)
+
+    -- появление: разворот из 94% (как у окна)
+    TweenService:Create(win, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = UDim2.fromOffset(winW, winH),
+    }):Play()
+    pcall(function() dim.BackgroundTransparency = 1 end)
+    TweenService:Create(dim, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { BackgroundTransparency = cfg.DimTransparency or 0.35 }):Play()
 
     local markHolder = new("Frame", {
         BackgroundTransparency = 1,
@@ -2301,8 +2314,16 @@ function Lib:Loader(cfg)
     function L:Destroy()
         if closed then return end
         closed = true
-        pcall(function() gui:Destroy() end)
-        if Lib.__loader == L then Lib.__loader = nil end
+        pcall(function()
+            TweenService:Create(win, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                Size = UDim2.fromOffset(math.floor(winW * 0.94), math.floor(winH * 0.94)),
+            }):Play()
+            TweenService:Create(dim, TweenInfo.new(0.14, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+        end)
+        task.delay(0.16, function()
+            pcall(function() gui:Destroy() end)
+            if Lib.__loader == L then Lib.__loader = nil end
+        end)
     end
 
     closeBtn.MouseButton1Click:Connect(function() L:Destroy() end)

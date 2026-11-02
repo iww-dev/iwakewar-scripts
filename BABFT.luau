@@ -34,6 +34,8 @@ genv0.__babftUI = GUI
 local Window = GUI:CreateWindow({
     Title = "BABFT Farm",
     Subtitle = "by iwakewar team",
+    Footer = "by iwakewar team",
+    Version = "v2-patch2 (2.0 P2, fullver 2.0.2)",
     Size = isPhone and UDim2.fromOffset(507, 325) or UDim2.fromOffset(780, 500),
     ToggleKey = Enum.KeyCode.LeftAlt,
 })
