@@ -101,7 +101,7 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 | `Tab:Slider({Title, Min, Max, Value, Callback})` | ползунок |
 | `Tab:Button({Title, Description, Callback})` | кнопка-строка |
 | `UI:Notify({Title, Content, Duration, Type, Accent})` | уведомление справа сверху; `Type` = `"info"` / `"success"` / `"warn"` / `"error"` |
-| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay, Delay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()`, `:SetTimeout(sec)`, `:ShowClose()` |
+| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay, Delay, Version})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()`, `:SetTimeout(sec)`, `:ShowClose()` |
 | `UI:OnLangChanged(fn)` / `UI:SetLang(l)` | подписка на смену языка |
 
 ## Loader mode — «Primordial Loader»

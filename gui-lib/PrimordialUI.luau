@@ -347,9 +347,10 @@ local Lib = {}
 Lib.__index = Lib
 Lib.Unloaded = false
 Lib.Options = {}
-Lib.Version = "2.0.0"
+Lib.Version = "2.1.1"
 Lib.Brand = "Primordial UI"
 Lib.LoaderBrand = "Primordial Loader"
+Lib.LoaderVersion = "2.1.1"
 Lib.Lang = "ru"
 Lib.Palette = P
 Lib.__loader = nil
@@ -2166,7 +2167,7 @@ function Lib:Loader(cfg)
         RichText = true,
         TextSize = 20,
         Position = UDim2.fromOffset(45, 12),
-        Size = UDim2.new(1, -66, 0, 28),
+        Size = UDim2.new(1, -150, 0, 28),
         TextTruncate = Enum.TextTruncate.AtEnd,
     }, W_SEMI)
 
@@ -2178,9 +2179,20 @@ function Lib:Loader(cfg)
         TextSize = 12,
         TextColor3 = P.dim,
         Position = UDim2.fromOffset(46, 37),
-        Size = UDim2.new(1, -66, 0, 16),
+        Size = UDim2.new(1, -110, 0, 16),
         TextTruncate = Enum.TextTruncate.AtEnd,
     })
+    -- версия самого лоадера, отдельно от версии загружаемого скрипта
+    text(win, {
+        Name = "LoaderVersion",
+        Text = "v" .. tostring(cfg.Version or Lib.LoaderVersion or Lib.Version),
+        TextSize = 12,
+        TextColor3 = P.accent,
+        Position = UDim2.new(1, -34, 0, 14),
+        AnchorPoint = Vector2.new(1, 0),
+        Size = UDim2.fromOffset(80, 16),
+        TextXAlignment = Enum.TextXAlignment.Right,
+    }, W_SEMI)
 
     new("Frame", {
         BackgroundColor3 = P.stroke,
