@@ -101,7 +101,7 @@ local Window = GUI:CreateWindow({
     Title = "iwakewar: Funky Friday",
     Subtitle = "by iwakewar team",
     Footer = "by iwakewar team",
-    Version = "v2.1.2 (v2.1-patch2)",
+    Version = "v2.1.3 (v2.1-patch3)",
     Folder = "iwakewar-funkyfriday",
     Icon = "music",
     Theme = "Rose",
@@ -405,10 +405,12 @@ local function doPress(lane, n, st)
                 -- hold started: keep the lane down, release at the tail end
                 local tail = tailNow or tailRef
                 local h = { note = n, tail = tail, at = os.clock(), limit = HOLD_TIMEOUT }
-                -- estimate Length from tail pixels / note pixels-per-second
+                -- estimate Length from tail pixels / note pixels-per-second.
+                -- Tail height is NEGATIVE while the streak grows upwards, so use
+                -- the magnitude: ~0 means the hold has just ended.
                 local vy = st.lastVy
-                if vy and vy > 30 and tail and tail.AbsoluteSize.Y > 0 then
-                    h.limit = math.min(HOLD_TIMEOUT, tail.AbsoluteSize.Y / vy + 0.8)
+                if vy and vy > 30 and tail and tail.AbsoluteSize.Y ~= 0 then
+                    h.limit = math.min(HOLD_TIMEOUT, math.abs(tail.AbsoluteSize.Y) / vy + 0.8)
                 end
                 holds[lane] = h
                 holdsFired = holdsFired + 1
@@ -443,7 +445,7 @@ local function updateHolds()
             done = true
         elseif not tail.Visible then
             done = true
-        elseif tail.AbsoluteSize.Y <= 1 then
+        elseif math.abs(tail.AbsoluteSize.Y) <= 1.5 then
             done = true
         elseif now - h.at > (h.limit or HOLD_TIMEOUT) then
             done = true
