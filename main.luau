@@ -11,6 +11,10 @@ local GAME_INFO = {
         name = "Basically FNF: Remix",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau",
     },
+    ["6447798030"] = {
+        name = "Funky Friday",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/FunkyFriday%20Auto-Play.luau",
+    },
     ["142823291"] = {
         name = "Murder Mystery 2",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
