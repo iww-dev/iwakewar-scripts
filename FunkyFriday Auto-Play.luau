@@ -62,6 +62,16 @@ local plr = Players.LocalPlayer
 local pg = plr.PlayerGui
 
 local genv0 = getgenv()
+
+-- one live instance only: stop the previous run first. Its Heartbeat loop would
+-- otherwise keep pressing/releasing the same lanes under the new copy, which is
+-- exactly what breaks holds and makes presses look instant.
+if type(genv0.__funkyfridayCleanup) == "function" then
+  pcall(genv0.__funkyfridayCleanup)
+end
+local INSTANCE = {}
+genv0.__funkyfridayInstance = INSTANCE
+
 if genv0.__funkyfridayGUI and type(genv0.__funkyfridayGUI.Destroy) == "function" then
   pcall(function() genv0.__funkyfridayGUI:Destroy() end)
 end
@@ -91,7 +101,7 @@ local Window = GUI:CreateWindow({
     Title = "iwakewar: Funky Friday",
     Subtitle = "by iwakewar team",
     Footer = "by iwakewar team",
-    Version = "v2.1.1 (v2.1-patch1)",
+    Version = "v2.1.2 (v2.1-patch2)",
     Folder = "iwakewar-funkyfriday",
     Icon = "music",
     Theme = "Rose",
@@ -299,6 +309,16 @@ local function releaseAll()
     for lane in pairs(laneDown) do releaseLane(lane) end
     holds = {}
     pending = {}
+end
+
+-- registered for the next run: kills this run before a new copy starts
+genv0.__funkyfridayCleanup = function()
+    if genv0.__funkyfridayInstance ~= INSTANCE then return end
+    enabled = false
+    pcall(releaseAll)
+    if GUI and type(GUI.Destroy) == "function" then
+        pcall(function() GUI:Destroy() end)
+    end
 end
 
 -- head = arrow frame (AnchorPoint ~0,0), tail = hold streak (AnchorPoint 0.5,1)
@@ -747,6 +767,7 @@ local runBaseAcc, runBaseHits = nil, nil
 task.spawn(function()
     while true do
         task.wait(0.5)
+        if genv0.__funkyfridayInstance ~= INSTANCE then break end
         if GUI.Unloaded then break end
 
         local okField = field ~= nil and field.Parent ~= nil
@@ -797,6 +818,7 @@ end)
 
 -- =============================================================== main loop
 RunService.Heartbeat:Connect(function()
+    if genv0.__funkyfridayInstance ~= INSTANCE then return end
     if not enabled then return end
 
     if antiAfk then
