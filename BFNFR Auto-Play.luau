@@ -49,7 +49,7 @@ local Window = GUI:CreateWindow({
     Title = "iwakewar: BFNFR",
     Subtitle = "by iwakewar team",
     Footer = "by iwakewar team",
-    Version = "v2-patch1 (2.0 P1, fullver 2.0.1)",
+    Version = "v2.0.2 (v2-patch2)",
     Folder = "iwakewar-bfnfr",
     Icon = "music",
     Theme = "Rose",
@@ -306,6 +306,13 @@ local function offsetMs(note: Instance): number
     return math.abs(note.Position.Y.Scale) / (11 * speed) * 2000
 end
 
+local TAP_HOLD_MIN = 0.0054  -- s, shortest human key press
+local TAP_HOLD_MAX = 0.0137  -- s, longest human key press
+
+local function randomHoldDuration(): number
+    return TAP_HOLD_MIN + math.random() * (TAP_HOLD_MAX - TAP_HOLD_MIN)
+end
+
 local function pressKey(lane: number)
     local kc = laneKeys[lane]
     if kc then
@@ -410,8 +417,21 @@ local function pressNote(lane: number, note: Instance, ar: Instance, ks: Instanc
 
         -- пресс строго в цель. никакой адаптивной калибровки: игра судит ровно по той
         -- позиции ноты, которую читаем мы, поэтому лид только вредил и уползал.
+        local isHold = note:GetAttribute("HoldHead") == true
+        local pressSeq = 0
         local function doPress()
             pressKey(lane)
+            pressSeq = pressSeq + 1
+            -- обычное нажатие не отпускаем мгновенно: человек держит клавишу
+            -- 5.4-13.7 мс. Для холдов клавиша остаётся зажатой до конца Streak.
+            if not isHold then
+                local seq = pressSeq
+                task.delay(randomHoldDuration(), function()
+                    if seq ~= pressSeq then return end
+                    if held[lane] then return end
+                    releaseKey(lane)
+                end)
+            end
         end
 
         -- Подтверждение попадания: единственный надёжный признак того, что игра

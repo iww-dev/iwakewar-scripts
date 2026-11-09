@@ -88,9 +88,10 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 
 | Метод | Что делает |
 |---|---|
-| `UI:CreateWindow(cfg)` | окно: `Title`, `Subtitle`, `Footer`, `Size`, `Accent`, `ToggleKey` |
+| `UI:CreateWindow(cfg)` | окно: `Title`, `Subtitle`, `Footer`, `Version`, `Size`, `Accent`, `ToggleKey` |
 | `Window:Tab(cfg)` | вкладка в сайдбаре: `Title`, `Subtitle` |
 | `Window:SelectTab(n)` / `Window:SetToggleKey(key)` | выбрать вкладку / клавиша показа окна |
+| `Window:SetVersion(text)` | версия в правом краю футера (`Window.VersionLabel` — сам текст) |
 | `Window:Show()`, `Hide()`, `Toggle()`, `Destroy()` | видимость и удаление |
 | `Tab:Section({Title})` | отдельная секция: чипсы сверху, видна только одна секция |
 | `Tab:Paragraph({Title, Content})` | карточка с текстом |
@@ -100,7 +101,7 @@ UI:Notify({ Title = "Loaded", Content = "Ready", Duration = 4 })
 | `Tab:Slider({Title, Min, Max, Value, Callback})` | ползунок |
 | `Tab:Button({Title, Description, Callback})` | кнопка-строка |
 | `UI:Notify({Title, Content, Duration, Type, Accent})` | уведомление справа сверху; `Type` = `"info"` / `"success"` / `"warn"` / `"error"` |
-| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()`, `:SetTimeout(sec)`, `:ShowClose()` |
+| `UI:Loader({Title, Subtitle, Status, Console, Width, Height, CloseDelay, Delay})` | сплэш-лоадер: `:SetStatus`, `:SetProgress(0-1)`, `:Log(line)`, `:Done()`, `:Fail()`, `:Destroy()`, `:SetTimeout(sec)`, `:ShowClose()` |
 | `UI:OnLangChanged(fn)` / `UI:SetLang(l)` | подписка на смену языка |
 
 ## Loader mode — «Primordial Loader»
@@ -121,6 +122,12 @@ Loader:Done("Loaded")
 
 `Console = false` убирает лог-панель, окно становится компактным. `CloseDelay`
 задаёт паузу перед закрытием после `:Done()`.
+
+`UI:Loader()` больше не грузит скрипт мгновенно: он держит сплэш на экране
+`Delay` секунд (по умолчанию **2**) и только потом возвращает управление, так что
+полезная нагрузка стартует после паузы. Если любой скрипт в этой же сессии создаёт
+своё окно через `CreateWindow`, лоадер скрывается **сразу** (без твина и
+`CloseDelay`) — окно игры/скрипта не ждёт анимацию сплэша.
 
 У лоадера всегда есть крестик в правом верхнем углу — выйти можно даже если
 что-то зависло. Плюс страховка от вечного окна:

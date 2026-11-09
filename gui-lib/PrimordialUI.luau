@@ -371,11 +371,16 @@ end
 
 function Lib:Destroy()
     Lib.Unloaded = true
+    local g = getgenv and getgenv() or _G
     if Lib.__window then
         pcall(function() Lib.__window:Destroy() end)
     end
     if Lib.__loader then
-        pcall(function() Lib.__loader:Destroy() end)
+        pcall(function() Lib.__loader:Destroy(true) end)
+    end
+    if g.__primordialLoader then
+        pcall(function() g.__primordialLoader:Destroy(true) end)
+        g.__primordialLoader = nil
     end
     if Lib.GUI then
         pcall(function() Lib.GUI:Destroy() end)
@@ -393,6 +398,17 @@ TabProto.__index = TabProto
 
 function Lib:CreateWindow(cfg)
     cfg = cfg or {}
+
+    -- A script that drew its own window means loading is over: kill any splash
+    -- from another instance immediately (main.luau loads this lib separately).
+    local genvRef = getgenv and getgenv() or _G
+    local activeLoader = genvRef.__primordialLoader
+    if activeLoader and type(activeLoader.Destroy) == "function" then
+        pcall(function() activeLoader:Destroy(true) end)
+    end
+    if Lib.__loader then
+        pcall(function() Lib.__loader:Destroy(true) end)
+    end
 
     if Lib.__window then
         pcall(function() Lib.__window:Destroy() end)
@@ -519,7 +535,8 @@ function Lib:CreateWindow(cfg)
         { 0, 0.84 }, { 0.45, 0.94 }, { 1, 1 },
     }))
 
-    local logoWrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(230, 42) }, top)
+    -- достаточно широко под длинный заголовок вида "iwakewar: Funky Friday"
+    local logoWrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -120, 0, 42) }, top)
     local markHolder = new("Frame", {
         BackgroundTransparency = 1,
         Size = UDim2.fromOffset(16, 16),
@@ -724,11 +741,11 @@ function Lib:CreateWindow(cfg)
     hgrad(footLine, P.stroke, P.stroke, numberSeq({
         { 0, 0.5 }, { 0.25, 0 }, { 0.75, 0 }, { 1, 0.5 },
     }))
-    -- футер: текст слева, версия акцентом и чуть жирнее, с отдельным отступом
+    -- футер: подпись слева, версия прижата к самому правому краю
     local footerRow = new("Frame", {
         BackgroundTransparency = 1,
         Position = UDim2.fromOffset(16, 0),
-        Size = UDim2.new(1, -32, 1, 0),
+        Size = UDim2.new(1, -140, 1, 0),
     }, footer)
     local footLayout = listLayout(footerRow, 16, Enum.FillDirection.Horizontal)
     footLayout.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -736,24 +753,38 @@ function Lib:CreateWindow(cfg)
         Text = cfg.Footer or (W.Title .. "   |   " .. W.Subtitle),
         TextColor3 = P.dim,
         TextSize = 12,
-        Size = UDim2.new(0, 0, 0, 32),
+        Size = UDim2.new(1, 0, 0, 32),
         AutomaticSize = Enum.AutomaticSize.X,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
     })
-    if cfg.Version and cfg.Version ~= "" then
-        local accentHex = string.format("%02X%02X%02X",
-            math.floor(P.accent.R * 255 + 0.5),
-            math.floor(P.accent.G * 255 + 0.5),
-            math.floor(P.accent.B * 255 + 0.5))
-        local ver = text(footerRow, {
-            Text = tostring(cfg.Version),
+
+    local versionLabel = nil
+    local function versionLabelGet()
+        if versionLabel then return versionLabel end
+        versionLabel = text(footer, {
+            Name = "Version",
+            Text = "",
             TextColor3 = P.accent,
             TextSize = 12,
-            Size = UDim2.new(0, 0, 0, 32),
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -16, 0, 0),
+            Size = UDim2.new(0, 0, 1, 0),
             AutomaticSize = Enum.AutomaticSize.X,
+            TextXAlignment = Enum.TextXAlignment.Right,
         }, W_SEMI)
-        ver.Name = "Version"
+        return versionLabel
     end
+
+    -- отдельная функция показа версии: W:SetVersion("v2.1.1")
+    function W:SetVersion(v)
+        local lbl = versionLabelGet()
+        local s = (v == nil) and "" or tostring(v)
+        lbl.Text = s
+        lbl.Visible = s ~= ""
+    end
+    W:SetVersion(cfg.Version)
+    W.VersionLabel = versionLabelGet()
 
     -- content -----------------------------------------------------------
     local content = new("Frame", {
@@ -2062,8 +2093,14 @@ end
 -- ======================================================================
 function Lib:Loader(cfg)
     cfg = cfg or {}
-    -- предыдущий лоадер убираем, чтобы не плодить оверлеи
-    if Lib.__loader then pcall(function() Lib.__loader:Destroy() end) end
+    local genvRef = getgenv and getgenv() or _G
+    -- предыдущий лоадер убираем, чтобы не плодить оверлеи (в т.ч. из другого
+    -- экземпляра библиотеки: main.luau грузит её отдельно от самих скриптов)
+    if Lib.__loader then pcall(function() Lib.__loader:Destroy(true) end) end
+    local prev = genvRef.__primordialLoader
+    if prev and type(prev.Destroy) == "function" then
+        pcall(function() prev:Destroy(true) end)
+    end
 
     local plr = game:GetService("Players").LocalPlayer
     local hasConsole = cfg.Console ~= false
@@ -2311,9 +2348,16 @@ function Lib:Loader(cfg)
         tween(fill, 0.2, { BackgroundColor3 = P.danger })
     end
 
-    function L:Destroy()
+    function L:Destroy(instant)
         if closed then return end
         closed = true
+        if genvRef.__primordialLoader == L then genvRef.__primordialLoader = nil end
+        if instant then
+            -- GUI скрипта уже на экране: убираем сплэш сразу, без твинов
+            pcall(function() gui:Destroy() end)
+            if Lib.__loader == L then Lib.__loader = nil end
+            return
+        end
         pcall(function()
             TweenService:Create(win, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
                 Size = UDim2.fromOffset(math.floor(winW * 0.94), math.floor(winH * 0.94)),
@@ -2350,6 +2394,14 @@ function Lib:Loader(cfg)
     end
 
     Lib.__loader = L
+    genvRef.__primordialLoader = L
+
+    -- Loader mode no longer starts the payload instantly: the splash is on screen
+    -- for `Delay` seconds (default 2) before the caller continues and loads.
+    local loadDelay = tonumber(cfg.Delay) or 2
+    if loadDelay > 0 and not closed then
+        task.wait(loadDelay)
+    end
     return L
 end
 

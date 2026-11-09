@@ -33,7 +33,8 @@
 --
 -- When to press / hold / release:
 --   TAP   : Fire(true) when the head centre reaches the receptor, Fire(false)
---           ~20 ms later (the release only clears ActionDown).
+--           after a human-like random hold of 5.4-13.7 ms (the release only
+--           clears ActionDown).
 --   HOLD  : Fire(true) at the head, keep it down. The game freezes the head
 --           on the receptor, hides it (Sprite.Frame.Visible = false) and
 --           shrinks the tail (Field.Update, CanMove = false). Release when
@@ -87,10 +88,10 @@ genv0.__funkyfridayGUI = GUI
 local isPhone = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 local Window = GUI:CreateWindow({
-    Title = "iwakewar: FunkyFriday",
+    Title = "iwakewar: Funky Friday",
     Subtitle = "by iwakewar team",
     Footer = "by iwakewar team",
-    Version = "v1.3",
+    Version = "v2.1.1 (v2.1-patch1)",
     Folder = "iwakewar-funkyfriday",
     Icon = "music",
     Theme = "Rose",
@@ -162,7 +163,8 @@ local tapsFired = 0
 local retries = 0
 local lastJump = 0
 
-local TAP_RELEASE = 0.018        -- s, tap release delay
+local TAP_HOLD_MIN = 0.0054       -- s, shortest human key press
+local TAP_HOLD_MAX = 0.0137       -- s, longest human key press
 local VERIFY_DELAY = 0.025       -- s, check that the press actually landed
 local RETRY_PAST = 0.14          -- s, do not retry a note that is already too late
 local PRESS_LEAD = 0.060         -- s, start scheduling presses this early
@@ -281,6 +283,11 @@ local function fire(lane, state)
     return (pcall(function() act:Fire(state) end))
 end
 
+-- real presses are never instant: hold the key for a random human duration
+local function randomHoldDuration()
+    return TAP_HOLD_MIN + math.random() * (TAP_HOLD_MAX - TAP_HOLD_MIN)
+end
+
 local function releaseLane(lane)
     if laneDown[lane] then
         laneDown[lane] = nil
@@ -352,6 +359,18 @@ local function doPress(lane, n, st)
 
     local wasHold = st.tail ~= nil
     local tailRef = st.tail
+
+    -- TAP: don't release instantly - a human key press lasts ~5.4-13.7 ms.
+    if not wasHold then
+        local pressAt = lanePressAt[lane]
+        task.delay(randomHoldDuration(), function()
+            if not enabled then return end
+            if lanePressAt[lane] ~= pressAt then return end
+            if holds[lane] then return end
+            releaseLane(lane)
+        end)
+    end
+
     task.delay(VERIFY_DELAY, function()
         if not enabled then return end
         if st.phase ~= "pressed" then return end
