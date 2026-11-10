@@ -1,4 +1,4 @@
--- WordGame Auto-Play  (Игра в Слова)
+-- russian WordGame auto play
 -- by iwakewar team
 -- placeId 71106427459865
 --
