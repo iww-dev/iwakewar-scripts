@@ -45,7 +45,7 @@ if genv0.__wordgameGUI and type(genv0.__wordgameGUI.Destroy) == "function" then
 end
 
 local DICT_URL = "https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt"
-local VERSION = "v0.2.0"
+local VERSION = "v0.3.0"
 
 -- ==================================================================== GUI
 local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau"
@@ -91,6 +91,7 @@ local enabled = false
 local wpm = 80
 local pickBestLetter = true
 local wordOrder = "long"   -- long | short | random
+local brainrot = false     -- only words ending with "е"
 local notificationsEnabled = true
 
 local Status, Live, DictInfo   -- filled in after the window is built
@@ -248,6 +249,50 @@ local function bestLetter(choices)
     return best, bestN
 end
 
+local function pickFromList(list, ok, needE)
+    local function good(w)
+        if not ok(w) then return false end
+        if needE and w:sub(-2) ~= "е" then return false end
+        return true
+    end
+
+    -- top-24 longest / top-24 shortest, then random inside that pool
+    if wordOrder == "long" or wordOrder == "short" then
+        local pool = {}
+        if wordOrder == "long" then
+            for i = 1, #list do
+                local w = list[i]
+                if good(w) then
+                    pool[#pool + 1] = w
+                    if #pool >= 24 then break end
+                end
+            end
+        else
+            for i = #list, 1, -1 do
+                local w = list[i]
+                if good(w) then
+                    pool[#pool + 1] = w
+                    if #pool >= 24 then break end
+                end
+            end
+        end
+        if #pool > 0 then
+            return pool[math.random(1, #pool)]
+        end
+        return nil
+    end
+
+    -- random: start at a random offset, take the first free word
+    local start = math.random(1, #list)
+    for i = 0, #list - 1 do
+        local w = list[(start + i - 1) % #list + 1]
+        if good(w) then
+            return w
+        end
+    end
+    return nil
+end
+
 local function pickWord(st)
     local letter = tostring(st.letter or ""):lower()
     if letter == "" then return nil end
@@ -264,41 +309,14 @@ local function pickWord(st)
         return not used[w] and not badWords[w]
     end
 
-    -- top-24 longest / top-24 shortest, then random inside that pool
-    if wordOrder == "long" or wordOrder == "short" then
-        local pool = {}
-        if wordOrder == "long" then
-            for i = 1, #list do
-                local w = list[i]
-                if ok(w) then
-                    pool[#pool + 1] = w
-                    if #pool >= 24 then break end
-                end
-            end
-        else
-            for i = #list, 1, -1 do
-                local w = list[i]
-                if ok(w) then
-                    pool[#pool + 1] = w
-                    if #pool >= 24 then break end
-                end
-            end
-        end
-        if #pool > 0 then
-            return pool[math.random(1, #pool)]
-        end
-        return nil
+    if brainrot then
+        local w = pickFromList(list, ok, true)
+        if w then return w end
+        -- no "е"-ending word for this letter: better to play something than lose the turn
+        return pickFromList(list, ok, false)
     end
 
-    -- random: start at a random offset, take the first free word
-    local start = math.random(1, #list)
-    for i = 0, #list - 1 do
-        local w = list[(start + i - 1) % #list + 1]
-        if ok(w) then
-            return w
-        end
-    end
-    return nil
+    return pickFromList(list, ok, false)
 end
 
 local function typeRemainder(st, word)
@@ -356,6 +374,10 @@ local function playTurn(st, key)
     lastSubmitKey = key
     stats.sent = stats.sent + 1
     lastWord = word
+
+    if brainrot and word:sub(-2) ~= "е" then
+        log(string.format("Мозгоёб: на «%s» нет слова на «е», играю %s", tostring(st.letter), word))
+    end
 
     Action:FireServer("word", word, {
         requestId = reqId,
@@ -468,6 +490,22 @@ Tabs.Main:Dropdown({
     end,
 })
 
+Tabs.Main:Toggle({
+    Title = "Режим Мозгоёб",
+    Description = "Писать только слова, заканчивающиеся на «е» (соперник получает «е»)",
+    Default = false,
+    Callback = function(state)
+        brainrot = state
+        if notificationsEnabled then
+            GUI:Notify({
+                Title = "Режим Мозгоёб",
+                Content = brainrot and "Включён: только слова на «е»" or "Выключен",
+                Duration = 2,
+            })
+        end
+    end,
+})
+
 Tabs.Main:Section({ Title = "Словарь" })
 
 local DictInfo
@@ -515,6 +553,7 @@ Tabs.Info:Paragraph({
         .. "- Слова с дефисами и пробелами отбрасываются\n"
         .. "- Буква выбирается по самому большому пулу слов\n"
         .. "- Приоритет: самые длинные / самые короткие / рандом\n"
+        .. "- Режим Мозгоёб: только слова, заканчивающиеся на «е»\n"
         .. "- Ввод посимвольный, скорость настраивается (WPM)\n"
         .. "- Уже использованные слова (свои и соперника) не повторяются\n"
         .. "- Если сервер не принял слово — берётся следующее\n\n"
@@ -584,6 +623,7 @@ genv0.__wordgameDebug = function()
         misses = stats.misses,
         lastWord = lastWord,
         wordOrder = wordOrder,
+        brainrot = brainrot,
         lastReject = lastReject and (tostring(lastReject.kind) .. ":" .. tostring(lastReject.reason) .. ":" .. tostring(lastReject.word)) or nil,
         histCount = (function()
             if type(match) == "table" and type(match.history) == "table" then return #match.history end
@@ -594,6 +634,12 @@ genv0.__wordgameDebug = function()
 end
 genv0.__wordgameSetEnabled = function(v)
     enabled = v and true or false
+end
+genv0.__wordgameSetBrainrot = function(v)
+    brainrot = v and true or false
+end
+genv0.__wordgameSetOrder = function(v)
+    if v == "short" or v == "long" or v == "random" then wordOrder = v end
 end
 
 if notificationsEnabled then
