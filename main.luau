@@ -15,6 +15,10 @@ local GAME_INFO = {
         name = "Funky Friday",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/FunkyFriday%20Auto-Play.luau",
     },
+    ["71106427459865"] = {
+        name = "Игра в Слова",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/WordGame%20Auto-Play.luau",
+    },
     ["142823291"] = {
         name = "Murder Mystery 2",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
