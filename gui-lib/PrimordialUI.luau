@@ -830,8 +830,6 @@ function Lib:CreateWindow(cfg)
         local st = stroke(card, P.stroke, 1, 1)
         strokeGrad(st, Color3.fromRGB(112, 112, 124), Color3.fromRGB(46, 46, 50),
             numberSeq({ { 0, 1 }, { 1, 1 } }))
-        -- отступы прямо на карточке: AutomaticSize учитывает UIPadding,
-        -- поэтому высота всегда совпадает с текстом
         padAll(card, NOTIFY_PAD_L, NOTIFY_PAD_V, NOTIFY_PAD_R, NOTIFY_PAD_V)
 
         local inner = new("Frame", {
@@ -868,7 +866,6 @@ function Lib:CreateWindow(cfg)
         syncBar()
         inner:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncBar)
 
-        -- прогресс-линия внизу: сколько уведомление ещё проживёт
         local progHolder = new("Frame", {
             BackgroundColor3 = Color3.new(0, 0, 0),
             BackgroundTransparency = 0.65,
