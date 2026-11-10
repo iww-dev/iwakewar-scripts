@@ -1,8 +1,8 @@
 --[[
-    PrimordialUI 1.1 — flat dark hub UI for Roblox executors.
+    PrimordialUI 1.1
     Style: left category sidebar, top sub-tab strip, cards with header strips,
-    compact rows, soft shadows, gradients and glassy dropdowns.
-    Sibling of "Primordial Loader" (Lib:Loader) — the same visual system for
+    compact rows, shadows, gradients and dropdowns.
+    Sibling of "Primordial Loader" (Lib:Loader) - the same visual system for
     splash screens. No external dependencies.
 
     Usage:
@@ -46,9 +46,6 @@ local P = {
     knob = Color3.fromRGB(238, 238, 244),
     danger = Color3.fromRGB(214, 94, 103),
     checkMark = Color3.fromRGB(26, 18, 22),
-
-    -- градиентные пары (верх/низ) для объёма: окно, карточки, элементы.
-    -- Всё в тех же тёмных оттенках, чтобы не выбиваться из палитры.
     bgTop = Color3.fromRGB(47, 47, 51),
     bgBottom = Color3.fromRGB(36, 36, 39),
     chromeTop = Color3.fromRGB(41, 41, 44),
@@ -76,8 +73,7 @@ local W_MED = Enum.FontWeight.Medium
 local W_SEMI = Enum.FontWeight.SemiBold
 local W_BOLD = Enum.FontWeight.Bold
 
--- JosefinSans вместо стандартного Gotham: свой шрифт без "роблоксовского" вида.
--- Если семейство не подгрузилось — молча падаем на Gotham.
+-- JosefinSans instead of "Gotham" (idunno wth is this gotham one)
 local function applyFont(o, weight)
     local ok = pcall(function()
         o.FontFace = Font.new(FONT_FAMILY, weight or W_REG)
@@ -168,7 +164,6 @@ local function button(parent, props, weight)
     return b
 end
 
--- рисованный логотип: не зависим от того, есть ли символ в шрифте
 local function drawLogoMark(parent, size, color)
     local mark = new("Frame", {
         BackgroundColor3 = color,
@@ -194,7 +189,6 @@ local function tween(o, time, props)
     TweenService:Create(o, TweenInfo.new(time or 0.12, Enum.EasingStyle.Quad), props):Play()
 end
 
--- короткая вспышка при нажатии по карточке-кнопке
 local function pressFlash(obj)
     if not obj then return end
     pcall(function()
@@ -228,7 +222,6 @@ local function numberSeq(list)
     return NumberSequence.new(kps)
 end
 
--- вертикальный градиент (сверху -> снизу): основной приём объёма
 local function vgrad(o, top, bottom, trans)
     local g = Instance.new("UIGradient")
     g.Rotation = 90
@@ -238,7 +231,6 @@ local function vgrad(o, top, bottom, trans)
     return g
 end
 
--- горизонтальный градиент (слева -> справа)
 local function hgrad(o, left, right, trans)
     local g = Instance.new("UIGradient")
     g.Rotation = 0
@@ -248,7 +240,6 @@ local function hgrad(o, left, right, trans)
     return g
 end
 
--- градиентная обводка: верх светлее, низ темнее (мягкий объём вместо плоской рамки)
 local function strokeGrad(st, top, bottom, transSeq)
     if not st then return nil end
     local g = Instance.new("UIGradient")
@@ -259,7 +250,6 @@ local function strokeGrad(st, top, bottom, transSeq)
     return g
 end
 
--- тонкая световая линия по верхней кромке: "стеклянный" блик
 local function rimLight(o, inset, transparency, thickness, radius)
     local r = new("Frame", {
         BackgroundColor3 = P.rim,
@@ -280,8 +270,6 @@ local function rimLight(o, inset, transparency, thickness, radius)
     return r
 end
 
--- мягкая тень вокруг произвольного элемента: несколько слоёв, растущих наружу.
--- host — контейнер, в котором лежит тень; target — сам элемент.
 local function softShadow(host, target, opts)
     opts = opts or {}
     local layers = opts.Layers or 4
@@ -465,10 +453,8 @@ function Lib:CreateWindow(cfg)
         Color3.fromRGB(108, 108, 120),
         Color3.fromRGB(46, 46, 50),
         numberSeq({ { 0, 0.1 }, { 0.55, 0.35 }, { 1, 0.62 } }))
-    -- окно лежит на игре без внешней тени: оригинальный primordial не даёт
-    -- ореола вокруг GUI, а тёмный ореол на светлом фоне читается как грязь
+
     W.Frame = root
-    -- верхний блик по кромке окна
     local rootRim = new("Frame", {
         BackgroundColor3 = P.rim,
         BackgroundTransparency = 0.92,
@@ -482,8 +468,6 @@ function Lib:CreateWindow(cfg)
         { 0, 1 }, { 0.1, 0.9 }, { 0.5, 0.84 }, { 0.9, 0.9 }, { 1, 1 },
     }))
 
-    -- анимация окна: при показе «разворот» из 94% + проявление,
-    -- при скрытии наоборот. так открытие/закрытие не дёргается
     local winWFull, winHFull = winW, winH
     local hideToken = 0
 
@@ -524,7 +508,7 @@ function Lib:CreateWindow(cfg)
     corner(top, 6)
     vgrad(top, P.chromeTop, P.chromeBottom)
     rimLight(top, 1, 0.94, 1, 3)
-    -- акцентное свечение под логотипом: очень слабое, только чтобы верх "жил"
+
     local topGlow = new("Frame", {
         BackgroundColor3 = P.accent,
         BackgroundTransparency = 0.94,
@@ -536,7 +520,6 @@ function Lib:CreateWindow(cfg)
         { 0, 0.84 }, { 0.45, 0.94 }, { 1, 1 },
     }))
 
-    -- достаточно широко под длинный заголовок вида "iwakewar: Funky Friday"
     local logoWrap = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -120, 0, 42) }, top)
     local markHolder = new("Frame", {
         BackgroundTransparency = 1,
@@ -586,8 +569,6 @@ function Lib:CreateWindow(cfg)
         return b
     end
 
-    -- иконки рисуем фреймами: JosefinSans не гарантирует наличие глифов ✕/–,
-    -- из-за чего кнопка закрытия выглядела пустой
     local function drawCross(parent, size, color, thickness)
         local holder = new("Frame", {
             BackgroundTransparency = 1,
@@ -711,8 +692,6 @@ function Lib:CreateWindow(cfg)
     sbPad.Parent = sidebar
     listLayout(sidebar, 2)
 
-    -- разделитель сайдбара: от низа топбара и до самого низа окна.
-    -- Градиент по вертикали, чтобы линия растворялась к краям окна.
     local sbLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
@@ -742,7 +721,7 @@ function Lib:CreateWindow(cfg)
     hgrad(footLine, P.stroke, P.stroke, numberSeq({
         { 0, 0.5 }, { 0.25, 0 }, { 0.75, 0 }, { 1, 0.5 },
     }))
-    -- футер: подпись слева, версия прижата к самому правому краю
+
     local footerRow = new("Frame", {
         BackgroundTransparency = 1,
         Position = UDim2.fromOffset(16, 0),
@@ -777,7 +756,6 @@ function Lib:CreateWindow(cfg)
         return versionLabel
     end
 
-    -- отдельная функция показа версии: W:SetVersion("v2.1.1")
     function W:SetVersion(v)
         local lbl = versionLabelGet()
         local s = (v == nil) and "" or tostring(v)
@@ -800,8 +778,6 @@ function Lib:CreateWindow(cfg)
     local ngui = Instance.new("ScreenGui")
     ngui.Name = "PrimordialNotify"
     ngui.ResetOnSpawn = false
-    -- false, а не true: в CoreGui при IgnoreGuiInset = true канвас уезжает
-    -- вверх на высоту топбара, и уведомления уходят за край экрана
     ngui.IgnoreGuiInset = false
     ngui.DisplayOrder = 120
     local nOk = pcall(function() ngui.Parent = game:GetService("CoreGui") end)
@@ -818,9 +794,6 @@ function Lib:CreateWindow(cfg)
     nLayout.SortOrder = Enum.SortOrder.LayoutOrder
     nLayout.Parent = notifyHolder
 
-    -- Notify: типы, акцентная полоска, прогресс-линия и закрытие по клику.
-    -- Полоска/прогресс — дети card, а card несёт UIPadding ради AutomaticSize,
-    -- поэтому их координаты компенсируют паддинг (иначе их сдвигает на текст).
     local NOTIFY_PAD_L, NOTIFY_PAD_R, NOTIFY_PAD_V = 16, 14, 9
     local NOTIFY_TYPES = {
         info = P.accent,
@@ -868,8 +841,6 @@ function Lib:CreateWindow(cfg)
         }, card)
         listLayout(inner, 4)
 
-        -- акцентная полоска: 5 px от левой кромки, высоту берём у inner,
-        -- а не scale — иначе AutomaticSize зацикливается
         local bar = new("Frame", {
             BackgroundColor3 = accent,
             BorderSizePixel = 0,
@@ -951,7 +922,6 @@ function Lib:CreateWindow(cfg)
             task.delay(t + 0.05, function() pcall(function() card:Destroy() end) end)
         end
 
-        -- клик по уведомлению закрывает его сразу
         card.MouseEnter:Connect(function()
             if closed then return end
             tween(st, 0.12, { Transparency = 0.05 })
@@ -988,7 +958,7 @@ function Lib:CreateWindow(cfg)
             pcall(function() pop:Destroy() end)
             return
         end
-        -- задвигаем обратно: высота 0 + гаснущий текст
+
         pcall(function()
             pop.ClipsDescendants = true
             local w = pop.AbsoluteSize.X
@@ -1048,9 +1018,6 @@ function Lib:CreateWindow(cfg)
                 ZIndex = 41,
             })
             corner(row, 3)
-            -- акцентная полоска выбранного пункта. Живёт внутри кнопки, поэтому
-            -- её сдвигает тот же UIPadding, что и текст: компенсируем отступ,
-            -- иначе полоска наезжает на первую букву.
             local rowPad = 14
             padAll(row, rowPad, 0, 8, 0)
             if isCur then
@@ -1081,7 +1048,6 @@ function Lib:CreateWindow(cfg)
             end)
         end
 
-        -- выдвигаем: высота 0 -> полная высота
         tween(pop, 0.15, { Size = UDim2.fromOffset(popW, popH) })
     end
     W.ClosePopup = closePopup
@@ -1191,7 +1157,6 @@ function Lib:CreateWindow(cfg)
     end
 
     local function makeCheckbox(parent, isOn, onChange)
-        -- тень под чекбоксом + мягкое свечение, когда он включён
         local halo = new("Frame", {
             BackgroundColor3 = P.accent,
             BackgroundTransparency = isOn and 0.86 or 1,
@@ -1393,7 +1358,7 @@ function Lib:CreateWindow(cfg)
             applyFont(other.NameLabel, active and W_MED or W_REG)
         end
         W.Active = tab
-        -- новая страница «доезжает» снизу, а не появляется рывком
+
         if tab and tab.Page then
             tab.Page.Position = UDim2.fromOffset(0, 8)
             pcall(function() tween(tab.Page, 0.2, { Position = UDim2.fromOffset(0, 0) }) end)
@@ -1482,8 +1447,6 @@ function Lib:CreateWindow(cfg)
 
         tab.BtnBg, tab.Bar, tab.NameLabel, tab.DescLabel = btnBg, bar, nameLabel, descLabel
         tab.BtnStroke, tab.ActiveTint, tab.BarGlow = btnStroke, activeTint, barGlow
-        -- пустая таблица, а не {Text = ...}: иначе ключ Text уже лежит в таблице
-        -- и __newindex никогда не срабатывает — переименование вкладки не работает
         tab.btn = setmetatable({}, {
             __index = function(_, k)
                 if k == "Text" then return nameLabel.Text end
@@ -1518,8 +1481,6 @@ function Lib:CreateWindow(cfg)
         stripPad.PaddingLeft = UDim.new(0, 6)
         stripPad.PaddingRight = UDim.new(0, 14)
         stripPad.Parent = strip
-        -- линия-разделитель живёт в page, а не в strip: иначе она участвует
-        -- в горизонтальном UIListLayout и выдавливает чипсы за экран
         local stripLine = new("Frame", {
             BackgroundColor3 = P.stroke,
             BorderSizePixel = 0,
@@ -1613,7 +1574,6 @@ function Lib:CreateWindow(cfg)
             corner(chipLine, 1)
             hgrad(chipLine, P.accentTop, P.accentBottom)
 
-            -- тонкий разделитель между чипсами, как в оригинальном primordial
             if #tab.Sections > 1 then
                 local sep = new("Frame", {
                     BackgroundColor3 = P.stroke,
@@ -1648,7 +1608,6 @@ function Lib:CreateWindow(cfg)
             end
         end
 
-        -- переключение секций: показываем только выбранную, остальные прячем
         function tab:_selectSection(sectionEntry)
             for _, s in ipairs(tab.Sections) do
                 local active = (s == sectionEntry)
@@ -1675,8 +1634,6 @@ function Lib:CreateWindow(cfg)
     -- ==================================================================
     -- tab elements
     -- ==================================================================
-    -- элементы кладём в контейнер текущей секции, а не в общий стек:
-    -- так каждая секция живёт на своём месте и не висит под предыдущей
     local function sectionParent(tab)
         local sec = tab.CurrentSection
         if sec and sec.Container then return sec.Container end
@@ -2090,13 +2047,11 @@ function Lib:CreateWindow(cfg)
 end
 
 -- ======================================================================
--- loader mode: отдельный сплэш для main.luau и любого лоадстринга
+-- loader mode
 -- ======================================================================
 function Lib:Loader(cfg)
     cfg = cfg or {}
     local genvRef = getgenv and getgenv() or _G
-    -- предыдущий лоадер убираем, чтобы не плодить оверлеи (в т.ч. из другого
-    -- экземпляра библиотеки: main.luau грузит её отдельно от самих скриптов)
     if Lib.__loader then pcall(function() Lib.__loader:Destroy(true) end) end
     local prev = genvRef.__primordialLoader
     if prev and type(prev.Destroy) == "function" then
@@ -2141,7 +2096,6 @@ function Lib:Loader(cfg)
         numberSeq({ { 0, 0.08 }, { 1, 0.6 } }))
     rimLight(win, 1, 0.92, 1, 3)
 
-    -- появление: разворот из 94% (как у окна)
     TweenService:Create(win, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Size = UDim2.fromOffset(winW, winH),
     }):Play()
@@ -2155,7 +2109,6 @@ function Lib:Loader(cfg)
     }, win)
     drawLogoMark(markHolder, 13, P.accent)
 
-    -- бренд лоадера: отдельное имя "Primordial Loader" в экосистеме Primordial
     local title = text(win, {
         Text = string.format('<font color="#E9E9EE">%s</font> <font color="#%s">%s</font>',
             tostring(cfg.Brand or "Primordial"),
@@ -2182,7 +2135,7 @@ function Lib:Loader(cfg)
         Size = UDim2.new(1, -110, 0, 16),
         TextTruncate = Enum.TextTruncate.AtEnd,
     })
-    -- версия самого лоадера, отдельно от версии загружаемого скрипта
+
     text(win, {
         Name = "LoaderVersion",
         Text = "v" .. tostring(cfg.Version or Lib.LoaderVersion or Lib.Version),
@@ -2274,8 +2227,6 @@ function Lib:Loader(cfg)
     }
     local closed = false
 
-    -- Рисованный крестик: в JosefinSans нет глифа ✕, а рамка на его месте
-    -- выглядит как битый символ, поэтому рисуем двумя повёрнутыми полосками.
     local function makeCloseIcon(host, color)
         local parts = {}
         for _, rot in ipairs({ 45, -45 }) do
@@ -2365,7 +2316,6 @@ function Lib:Loader(cfg)
         closed = true
         if genvRef.__primordialLoader == L then genvRef.__primordialLoader = nil end
         if instant then
-            -- GUI скрипта уже на экране: убираем сплэш сразу, без твинов
             pcall(function() gui:Destroy() end)
             if Lib.__loader == L then Lib.__loader = nil end
             return
@@ -2384,9 +2334,6 @@ function Lib:Loader(cfg)
 
     closeBtn.MouseButton1Click:Connect(function() L:Destroy() end)
 
-    -- Сколько лоадер живёт максимум. Если за это время никто не вызвал
-    -- :Done()/:Destroy(), он покажет ошибку и сам уйдёт с экрана, чтобы
-    -- не остаться вечной картинкой поверх игры.
     local watchdog = nil
     function L:SetTimeout(sec)
         if watchdog then pcall(task.cancel, watchdog) end
@@ -2397,8 +2344,6 @@ function Lib:Loader(cfg)
         end)
     end
 
-    -- Подсветить кнопку закрытия (кнопка и так есть; метод для интеграций,
-    -- которые раньше звали ui.showClose()).
     function L:ShowClose()
         if closed then return end
         tintClose(P.danger)
@@ -2408,8 +2353,7 @@ function Lib:Loader(cfg)
     Lib.__loader = L
     genvRef.__primordialLoader = L
 
-    -- Loader mode no longer starts the payload instantly: the splash is on screen
-    -- for `Delay` seconds (default 2) before the caller continues and loads.
+    -- Loader mode no longer starts the payload instantly
     local loadDelay = tonumber(cfg.Delay) or 2
     if loadDelay > 0 and not closed then
         task.wait(loadDelay)
@@ -2424,10 +2368,6 @@ function Lib:Notify(opts)
     return nil
 end
 Lib.CreateNotification = Lib.Notify
-
--- мягкая тень вокруг произвольного элемента (оставлена как публичный хелпер:
--- окно/лоадер/дропдаун её больше не используют — в оригинальном primordial
--- внешних ореолов нет).
 Lib.SoftShadow = softShadow
 
 local genv = getgenv and getgenv() or _G
