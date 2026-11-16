@@ -31,6 +31,18 @@ local GAME_INFO = {
         name = "Build A Boat For Treasure",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BABFT.luau",
     },
+    -- UnAim is written against Scoped FPS internals (ReplicatedStorage.Utils.CameraController
+    -- for the camera / GetAimRay, ReplicatedStorage.GameMode.MatchQuery for the team model),
+    -- so it is mapped to this game only, per place id. Any other game would need its own
+    -- integration layer before being added here.
+    ["93466613073564"] = {
+        name = "Scoped FPS",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/UnAim.luau",
+    },
+    ["114689356953798"] = {
+        name = "Scoped FPS",
+        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/UnAim.luau",
+    },
 }
 
 local function escapeUrl(path: string): string
