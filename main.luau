@@ -19,14 +19,6 @@ local GAME_INFO = {
         name = "Игра в Слова",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/WordGame%20Auto-Play.luau",
     },
-    ["142823291"] = {
-        name = "Murder Mystery 2",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/MM2.luau",
-    },
-    ["9872472334"] = {
-        name = "Evade",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/Evade.luau",
-    },
     ["537413528"] = {
         name = "Build A Boat For Treasure",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BABFT.luau",

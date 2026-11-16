@@ -120,7 +120,7 @@ Window = GUI:CreateWindow({
     Title = "iwakewar: UnAim",
     Subtitle = "by iwakewar team",
     Footer = "by iwakewar team",
-    Version = "v1.3.0",
+    Version = "v2.3.0",
     Size = UDim2.fromOffset(760, 500),
     ToggleKey = Enum.KeyCode.RightShift,
 })

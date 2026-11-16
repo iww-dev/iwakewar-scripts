@@ -45,7 +45,7 @@ if genv0.__wordgameGUI and type(genv0.__wordgameGUI.Destroy) == "function" then
 end
 
 local DICT_URL = "https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt"
-local VERSION = "v0.3.0"
+local VERSION = "v2.3.0"
 
 -- ==================================================================== GUI
 local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau"
