@@ -4,7 +4,8 @@ local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
 local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
-local V = "v3.3.2"
+local V = "v3.3.3"
+local ACC_ON = false -- аккаунты временно отключены
 
 local G = {
     ["6520999642"] = { n = "Basically FNF: Remix", f = "BFNFR Auto-Play.luau" },
@@ -1459,7 +1460,7 @@ local function go()
             if busy then return end
             if input.KeyCode == Enum.KeyCode.RightShift then
                 uiToggle(nil)
-            elseif input.KeyCode == Enum.KeyCode.F3 then
+            elseif input.KeyCode == Enum.KeyCode.F3 and ACC_ON then
                 task.spawn(function()
                     local a = accountUI(C.acc)
                     if a == false then
@@ -1480,18 +1481,23 @@ local function go()
         end)
     end)
 
-    if UI then UI.hide() end
-    local acc: any = accountGate()
-    if not acc then
+    local acc: any = nil
+    if ACC_ON then
+        if UI then UI.hide() end
+        acc = accountGate()
+        if not acc then
+            if UI then UI.show() end
+            st("Account required.")
+            bad("Account required.", "войди или создай аккаунт, чтобы запустить скрипт")
+            return
+        end
         if UI then UI.show() end
-        st("Account required.")
-        bad("Account required.", "войди или создай аккаунт, чтобы запустить скрипт")
-        return
+        C.acc = acc
+        setAccUI(acc)
+        msg("account: " .. tostring(acc.u) .. " (" .. tostring(acc.r) .. ") · F3 профиль")
+    else
+        msg("account: выключен")
     end
-    if UI then UI.show() end
-    C.acc = acc
-    setAccUI(acc)
-    msg("account: " .. tostring(acc.u) .. " (" .. tostring(acc.r) .. ") · F3 профиль")
 
     msg("executor: " .. e0)
 
