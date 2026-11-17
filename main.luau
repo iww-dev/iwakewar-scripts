@@ -4,7 +4,7 @@ local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
 local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
-local V = "v3.3.3"
+local V = "v3.3.4"
 local ACC_ON = false -- аккаунты временно отключены
 
 local G = {
@@ -1367,6 +1367,7 @@ local function bus(id: string, pn: string, refresh: () -> string?)
         local res = ""
         local fails = 0
         while true do
+            local quick = false
             local p = P.LocalPlayer
             if not p or not p.Parent then return end
             local now = os.clock()
@@ -1408,10 +1409,16 @@ local function bus(id: string, pn: string, refresh: () -> string?)
                     local okc, done = pcall(exec, kind, r)
                     ack = cid
                     res = (okc and done) and "ok" or "fail"
+                    quick = true
                 end
             else
                 fails += 1
                 task.wait(math.min(5, 1 + fails))
+            end
+
+            if r and not quick then
+                -- idle: one poll every ~6.5 minutes to stay far below request limits
+                task.wait(370)
             end
         end
     end)
