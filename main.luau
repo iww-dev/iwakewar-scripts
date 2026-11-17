@@ -1,49 +1,19 @@
--- iwakewar-scripts | loader
--- loadstring(game:HttpGet("https://iwakewar.fun/scripts/main.luau?k=5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"))()
-
 local P = game:GetService("Players")
 local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
-
-local function su(p: string): string
-    return B .. (p:gsub(" ", "%%20"))
-end
+local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
 
 local G = {
-    ["6520999642"] = {
-        name = "Basically FNF: Remix",
-        file = "BFNFR Auto-Play.luau",
-        url = su("BFNFR Auto-Play.luau"),
-    },
-    ["6447798030"] = {
-        name = "Funky Friday",
-        file = "FunkyFriday Auto-Play.luau",
-        url = su("FunkyFriday Auto-Play.luau"),
-    },
-    ["71106427459865"] = {
-        name = "Игра в Слова",
-        file = "WordGame Auto-Play.luau",
-        url = su("WordGame Auto-Play.luau"),
-    },
-    ["537413528"] = {
-        name = "Build A Boat For Treasure",
-        file = "BABFT.luau",
-        url = su("BABFT.luau"),
-    },
-    ["93466613073564"] = {
-        name = "Scoped FPS",
-        file = "UnAim.luau",
-        url = su("UnAim.luau"),
-    },
-    ["114689356953798"] = {
-        name = "Scoped FPS",
-        file = "UnAim.luau",
-        url = su("UnAim.luau"),
-    },
+    ["6520999642"] = { n = "Basically FNF: Remix", f = "BFNFR Auto-Play.luau" },
+    ["6447798030"] = { n = "Funky Friday", f = "FunkyFriday Auto-Play.luau" },
+    ["71106427459865"] = { n = "Игра в Слова", f = "WordGame Auto-Play.luau" },
+    ["537413528"] = { n = "Build A Boat For Treasure", f = "BABFT.luau" },
+    ["93466613073564"] = { n = "Scoped FPS", f = "UnAim.luau" },
+    ["114689356953798"] = { n = "Scoped FPS", f = "UnAim.luau" },
 }
 
-local T: string? = nil -- run ticket from the server
+local T: string? = nil
 
 local function en(v: any): string
     return (tostring(v):gsub("[^%w%-%._~]", function(c: string): string
@@ -51,14 +21,14 @@ local function en(v: any): string
     end))
 end
 
-local function gv(): any
+local function gg(): any
     local ok, t = pcall(function() return getgenv() end)
     if ok and typeof(t) == "table" then return t end
     return _G
 end
 
-local function rq(u: string): string?
-    local g = gv()
+local function q(u: string): string?
+    local g = gg()
     local f = (g.syn and g.syn.request) or (g.http and g.http.request) or g.http_request
         or (g.fluxus and g.fluxus.request) or g.request
     if typeof(f) == "function" then
@@ -68,13 +38,9 @@ local function rq(u: string): string?
             if typeof(r) == "string" then return r end
         end
     end
-    local ok, r = pcall(function()
-        return game:HttpGet(u)
-    end)
+    local ok, r = pcall(function() return game:HttpGet(u) end)
     if ok and typeof(r) == "string" then return r end
-    local ok2, r2 = pcall(function()
-        return game:GetService("HttpService"):GetAsync(u)
-    end)
+    local ok2, r2 = pcall(function() return game:GetService("HttpService"):GetAsync(u) end)
     if ok2 and typeof(r2) == "string" then return r2 end
     return nil
 end
@@ -82,9 +48,7 @@ end
 local function hw(): string
     local ok, v = pcall(function() return gethwid() end)
     if ok and typeof(v) == "string" and #v > 0 then return v end
-    local ok2, c = pcall(function()
-        return game:GetService("RbxAnalyticsService"):GetClientId()
-    end)
+    local ok2, c = pcall(function() return game:GetService("RbxAnalyticsService"):GetClientId() end)
     if ok2 and typeof(c) == "string" and #c > 0 then return c end
     local p = P.LocalPlayer
     return "uid-" .. tostring(p and p.UserId or 0)
@@ -96,7 +60,6 @@ local function ex(): string
     return "unknown"
 end
 
--- integrity digest: must match checksum() in the worker
 local function ck(s: string): number
     local n = #s
     local t = 0
@@ -112,7 +75,7 @@ local function ck(s: string): number
     return (n * 2654435761 + t) % 4294967296
 end
 
-local function fallback()
+local function sp()
     local p = P.LocalPlayer
     if not p then return nil end
     local pg = p:FindFirstChildOfClass("PlayerGui") or p:WaitForChild("PlayerGui", 10)
@@ -120,11 +83,11 @@ local function fallback()
 
     local C = Color3.fromRGB
     local F = Enum.Font.Code
-    local TXT = C(220, 220, 220)
-    local DIM = C(140, 140, 140)
-    local GRN = C(0, 255, 0)
-    local RED = C(255, 60, 60)
-    local LINE = C(70, 70, 70)
+    local TX = C(220, 220, 220)
+    local DM = C(140, 140, 140)
+    local GN = C(0, 255, 0)
+    local RD = C(255, 60, 60)
+    local LN = C(70, 70, 70)
 
     local sg = Instance.new("ScreenGui")
     sg.Name = "iwakewar-scripts"
@@ -142,13 +105,13 @@ local function fallback()
     w.Parent = sg
 
     local st = Instance.new("UIStroke")
-    st.Color = LINE
+    st.Color = LN
     st.Thickness = 1
     st.Parent = w
 
     local ac = Instance.new("Frame")
     ac.Size = UDim2.new(1, 0, 0, 2)
-    ac.BackgroundColor3 = GRN
+    ac.BackgroundColor3 = GN
     ac.BorderSizePixel = 0
     ac.Parent = w
 
@@ -158,7 +121,7 @@ local function fallback()
     ti.Position = UDim2.new(0, 12, 0, 8)
     ti.Size = UDim2.new(1, -24, 0, 22)
     ti.Text = "> iwakewar-scripts_"
-    ti.TextColor3 = TXT
+    ti.TextColor3 = TX
     ti.TextSize = 17
     ti.TextXAlignment = Enum.TextXAlignment.Left
     ti.Parent = w
@@ -175,7 +138,7 @@ local function fallback()
     sb.Parent = w
 
     local ln = Instance.new("Frame")
-    ln.BackgroundColor3 = LINE
+    ln.BackgroundColor3 = LN
     ln.BorderSizePixel = 0
     ln.Position = UDim2.new(0, 12, 0, 48)
     ln.Size = UDim2.new(1, -24, 0, 1)
@@ -212,7 +175,7 @@ local function fallback()
     er.Position = UDim2.new(0, 12, 0, 232)
     er.Size = UDim2.new(1, -24, 0, 30)
     er.Text = ""
-    er.TextColor3 = RED
+    er.TextColor3 = RD
     er.TextSize = 11
     er.TextWrapped = true
     er.TextXAlignment = Enum.TextXAlignment.Left
@@ -237,25 +200,30 @@ local function fallback()
     end)
 
     local n = 0
-    local ui: any = {}
-    local dead = false
+    local Hs = {}
+    local o: any = {}
+    local dn = false
 
-    ui.log = function(t: string, c: Color3?)
+    o.Hs = Hs
+    o.gu = sg
+
+    o.log = function(t: string, c: Color3?)
+        Hs[#Hs + 1] = { t, c }
         n += 1
         local l = Instance.new("TextLabel")
         l.BackgroundTransparency = 1
         l.Font = F
         l.Size = UDim2.new(1, 0, 0, 15)
         l.Text = t
-        l.TextColor3 = c or DIM
+        l.TextColor3 = c or DM
         l.TextSize = 12
         l.TextXAlignment = Enum.TextXAlignment.Left
         l.TextTruncate = Enum.TextTruncate.AtEnd
         l.LayoutOrder = n
         l.Parent = co
-        local kids = co:GetChildren()
-        if #kids > 12 then
-            for _, v in ipairs(kids) do
+        local ks = co:GetChildren()
+        if #ks > 12 then
+            for _, v in ipairs(ks) do
                 if v:IsA("TextLabel") and v.LayoutOrder <= n - 11 then
                     v:Destroy()
                 end
@@ -263,56 +231,57 @@ local function fallback()
         end
     end
 
-    ui.status = function(t: string)
-        ui.log("> " .. t)
+    o.status = function(t: string, c: Color3?)
+        o.log("> " .. t, c)
     end
 
-    ui.fail = function(m: string, d: string?)
-        dead = true
+    o.fail = function(m: string, d: string?)
+        dn = true
         local full = m
         if d and #d > 0 then full = m .. " | " .. d end
         warn("[iwakewar-scripts] " .. full)
-        ui.log("> " .. m, RED)
+        o.log("> " .. m, RD)
         er.Text = full:sub(1, 120)
         er.Visible = true
         bs.Visible = true
     end
 
-    ui.ok = function(m: string)
-        ui.log("> " .. m, GRN)
+    o.ok = function(m: string)
+        o.log("> " .. m, GN)
     end
 
-    ui.close = function()
+    o.close = function()
         if sg.Parent then sg:Destroy() end
     end
 
-    ui.didFail = function(): boolean
-        return dead
+    o.df = function(): boolean
+        return dn
     end
 
-    return ui
+    return o
 end
 
-local LIB = su("gui-lib/PrimordialUI.luau")
-
-local function lib(): any
-    local g = gv()
-    if typeof(g.__iwPrimordial) == "table" then return g.__iwPrimordial end
-    local s = rq(LIB .. "?k=" .. K)
+local function lb(): any
+    local g = gg()
+    if typeof(g.__iwL) == "table" then return g.__iwL end
+    local s = q(R .. "gui-lib/PrimordialUI.luau")
+    if not s or #s < 100 then
+        s = q(B .. "gui-lib/PrimordialUI.luau?k=" .. K)
+    end
     if not s or #s < 100 then return nil end
     local ok, r = pcall(function()
         return loadstring(s)()
     end)
     if ok and typeof(r) == "table" and typeof(r.Loader) == "function" then
-        g.__iwPrimordial = r
+        g.__iwL = r
         return r
     end
     return nil
 end
 
-local function prim(UI: any)
+local function pr(b: any, Hs: any): any
     local ok, L = pcall(function()
-        return UI:Loader({
+        return b:Loader({
             Title = "iwakewar-scripts",
             Subtitle = "v3.0.0",
             Status = "Booting...",
@@ -323,51 +292,46 @@ local function prim(UI: any)
     end)
     if not ok or typeof(L) ~= "table" then return nil end
 
-    local ui: any = {}
-    local dead = false
-    local OKC = Color3.fromRGB(148, 219, 168)
-    local BADC = Color3.fromRGB(214, 94, 103)
-    local DIMC = Color3.fromRGB(139, 139, 150)
+    local o: any = {}
+    local dn = false
+    local OC = Color3.fromRGB(148, 219, 168)
+    local DC = Color3.fromRGB(139, 139, 150)
 
-    ui.log = function(t: string, c: Color3?)
+    o.log = function(t: string, c: Color3?)
         pcall(function() L:Log(t, c) end)
     end
-    ui.status = function(t: string, c: Color3?)
+    o.status = function(t: string, c: Color3?)
         pcall(function() L:SetStatus(t) end)
-        pcall(function() L:Log("> " .. t, c or DIMC) end)
+        pcall(function() L:Log("> " .. t, c or DC) end)
     end
-    ui.fail = function(m: string, d: string?)
-        dead = true
+    o.fail = function(m: string, d: string?)
+        dn = true
         local full = m
         if d and #d > 0 then full = m .. "  |  " .. d end
         warn("[iwakewar-scripts] " .. full)
         pcall(function() L:Fail(full:sub(1, 160)) end)
         pcall(function() L:ShowClose() end)
     end
-    ui.ok = function(m: string)
+    o.ok = function(m: string)
         pcall(function() L:Done(m or "Loaded") end)
-        pcall(function() L:Log(m or "Loaded", OKC) end)
+        pcall(function() L:Log(m or "Loaded", OC) end)
     end
-    ui.close = function()
+    o.close = function()
         pcall(function() L:Destroy() end)
     end
-    ui.didFail = function(): boolean
-        return dead
+    o.df = function(): boolean
+        return dn
+    end
+    o.Hs = Hs
+
+    for _, v in ipairs(Hs) do
+        pcall(function() L:Log(v[1], v[2]) end)
     end
     pcall(function() L:SetTimeout(30) end)
-    return ui
+    return o
 end
 
-local function makeUI()
-    local b = lib()
-    if b then
-        local p = prim(b)
-        if p then return p end
-    end
-    return fallback()
-end
-
-local function loop(id: string, pid: string, pn: string, sup: boolean)
+local function pl(id: string)
     task.spawn(function()
         local last = os.clock()
         while true do
@@ -376,7 +340,7 @@ local function loop(id: string, pid: string, pn: string, sup: boolean)
             local now = os.clock()
             local d = math.min(math.floor(now - last), 120)
             last = now
-            local r = rq(U .. "/api/ping?k=" .. K .. "&t=" .. tostring(T) .. "&hwid=" .. en(id) .. "&p=" .. d)
+            local r = q(U .. "/api/ping?k=" .. K .. "&t=" .. tostring(T) .. "&hwid=" .. en(id) .. "&p=" .. d)
             if r and r:find('"banned"%s*:%s*true') then return end
             task.wait(60)
         end
@@ -392,91 +356,165 @@ local function go()
         p = P.LocalPlayer
     end
 
-    local ui = makeUI()
-    local function say(t: string)
-        if ui then ui.log(t) end
+    local D = sp()
+    local W: any = {}
+    W.k = D
+    W.log = function(t: string, c: Color3?)
+        if W.k then W.k.log(t, c) end
+    end
+    W.status = function(t: string, c: Color3?)
+        if W.k then W.k.status(t, c) end
+    end
+    W.fail = function(m: string, d: string?)
+        if W.k then W.k.fail(m, d) end
+    end
+    W.ok = function(m: string)
+        if W.k then W.k.ok(m) end
+    end
+    W.close = function()
+        if W.k then W.k.close() end
+    end
+    W.df = function(): boolean
+        if W.k then return W.k.df() end
+        return true
     end
 
     if not p then
-        if ui then ui.fail("No player.") end
+        W.fail("No player.")
         return
     end
 
-    if ui then ui.status("Checking executor...") end
-    local e = ex()
+    local g = gg()
+    local C = g.__iw
+    if typeof(C) ~= "table" then
+        C = {}
+        g.__iw = C
+    end
+    if typeof(C.s) ~= "table" then C.s = {} end
+
+    local e0 = ex()
     local id = hw()
     local pid = tostring(game.PlaceId or "")
     local gi = G[pid]
-    local pn = gi and gi.name
+    local pn = gi and gi.n
     if not pn then
-        local ok, pr = pcall(function()
+        local ok, r = pcall(function()
             return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId, Enum.InfoType.Asset)
         end)
-        if ok and typeof(pr) == "table" and typeof(pr.Name) == "string" then
-            pn = pr.Name
+        if ok and typeof(r) == "table" and typeof(r.Name) == "string" then
+            pn = r.Name
         else
             pn = "place " .. pid
         end
     end
-    say("executor: " .. e)
 
-    if ui then ui.status("Handshake...") end
-    local r = rq(U .. "/api/start?k=" .. K .. "&hwid=" .. en(id) .. "&uid=" .. en(p.UserId) .. "&u=" .. en(p.Name)
-        .. "&e=" .. en(e) .. "&pid=" .. en(pid) .. "&pn=" .. en(pn) .. "&s=" .. (gi and "1" or "0"))
-    if not r then
-        if ui then ui.fail("Cannot reach server.", "connection / VPN?") end
-        return
+    W.log("executor: " .. e0)
+
+    local t0 = C.t
+    if t0 and C.x and C.x > os.time() then
+        T = t0
     end
-    if r:find('"banned"%s*:%s*true') then
-        warn("[iwakewar-scripts] access denied: this device / account is hardbanned")
-        if ui then ui.fail("Access denied.", "device / account is hardbanned") end
-        return
-    end
-    T = r:match('"t"%s*:%s*"([0-9a-f]+)"')
-    if not T then
-        if ui then ui.fail("Handshake failed.", r:sub(1, 80)) end
-        return
-    end
-    loop(id, pid, pn, gi ~= nil)
+
+    task.spawn(function()
+        local r = q(U .. "/api/start?k=" .. K .. "&hwid=" .. en(id) .. "&uid=" .. en(p.UserId) .. "&u=" .. en(p.Name)
+            .. "&e=" .. en(e0) .. "&pid=" .. en(pid) .. "&pn=" .. en(pn) .. "&s=" .. (gi and "1" or "0"))
+        if not r then return end
+        if r:find('"banned"%s*:%s*true') then
+            C.bn = true
+            W.fail("Access denied.", "device / account is hardbanned")
+            return
+        end
+        local t = r:match('"t"%s*:%s*"([0-9a-f]+)"')
+        if t then
+            T = t
+            C.t = t
+            C.x = os.time() + 540
+            pl(id)
+        end
+    end)
+
+    task.spawn(function()
+        local b = lb()
+        if not b then return end
+        local L = pr(b, D and D.Hs or {})
+        if not L then return end
+        W.k = L
+        if D then D.close() end
+    end)
 
     if not gi then
-        say("game: " .. pn)
-        if ui then ui.fail("This game is not supported (yet).", "place=" .. pid) end
+        W.log("game: " .. tostring(pn))
+        W.fail("This game is not supported (yet).", "place=" .. pid)
         return
     end
-    say("game: " .. gi.name)
+    W.log("game: " .. gi.n)
 
-    if ui then ui.status("Fetching " .. gi.name .. "...") end
-    local src = rq(gi.url .. "?k=" .. K .. "&t=" .. T)
-    if not src or #src < 8 then
-        if ui then ui.fail("Failed to download script.") end
+    local s = C.s[pid]
+    local sf = false
+    if typeof(s) ~= "string" or #s < 100 then
+        s = nil
+    end
+
+    if s then
+        W.log("cache hit: " .. gi.n)
+    else
+        W.status("Fetching " .. gi.n .. "...")
+        s = q(R .. en(gi.f))
+        if not s or #s < 100 then s = nil end
+        if not s then
+            local w = 0
+            while not T and w < 30 do
+                task.wait(0.1)
+                w += 1
+            end
+            if T then
+                local x = q(B .. en(gi.f) .. "?k=" .. K .. "&t=" .. T)
+                if x and #x > 100 and x ~= "not found" then
+                    s = x
+                    sf = true
+                end
+            end
+        end
+        if not s then
+            W.fail("Failed to download script.", "no connection?")
+            return
+        end
+        C.s[pid] = s
+    end
+
+    if C.bn then
+        W.fail("Access denied.", "device / account is hardbanned")
         return
     end
 
-    local v = rq(U .. "/api/verify?k=" .. K .. "&t=" .. T .. "&f=" .. en(gi.file) .. "&h=" .. string.format("%.0f", ck(src)) .. "&hwid=" .. en(id))
-    if v and v:find('"ok"%s*:%s*false') then
-        if ui then ui.fail("Integrity check failed.", "code does not match the server copy") end
-        return
-    end
-    say(string.format("GET %s (%.1f KB)", gi.name, #src / 1024))
+    task.spawn(function()
+        local t = T
+        if not t or not sf then return end
+        local v = q(U .. "/api/verify?k=" .. K .. "&t=" .. t .. "&f=" .. en(gi.f) .. "&h="
+            .. string.format("%.0f", ck(s)) .. "&hwid=" .. en(id))
+        if v and v:find('"ok"%s*:%s*false') then
+            warn("[iwakewar-scripts] integrity mismatch: " .. gi.f)
+        end
+    end)
 
-    if ui then ui.status("Injecting...") end
-    local fn, ce = loadstring(src)
+    W.log(string.format("GET %s (%.1f KB)", gi.n, #s / 1024))
+    W.status("Injecting...")
+
+    local fn, ce = loadstring(s)
     if not fn then
-        if ui then ui.fail("Compile error.", tostring(ce)) end
+        W.fail("Compile error.", tostring(ce))
         return
     end
     local ok, re = pcall(fn)
     if not ok then
-        if ui then ui.fail("Script errored.", tostring(re)) end
+        W.fail("Script errored.", tostring(re))
         return
     end
-    if ui then
-        ui.ok("Loaded - enjoy")
-        task.delay(1.4, function()
-            if not ui.didFail() then ui.close() end
-        end)
-    end
+
+    W.ok("Loaded - enjoy")
+    task.delay(1.4, function()
+        if not W.df() then W.close() end
+    end)
 end
 
 local ok, err = pcall(go)
