@@ -2223,6 +2223,8 @@ function Lib:Loader(cfg)
         Progress = fill,
     }
     local closed = false
+    local hidden = false
+    local watchdog = nil
 
     local function makeCloseIcon(host, color)
         local parts = {}
@@ -2298,7 +2300,9 @@ function Lib:Loader(cfg)
         statusLbl.TextColor3 = P.accent
         statusLbl.Text = tostring(text or "Done")
         tween(fill, 0.2, { Size = UDim2.new(1, 0, 1, 0) })
-        task.delay(delay or cfg.CloseDelay or 0.9, function() L:Destroy() end)
+        if not cfg.KeepOpen then
+            task.delay(delay or cfg.CloseDelay or 0.9, function() L:Destroy() end)
+        end
     end
 
     function L:Fail(text)
@@ -2331,7 +2335,6 @@ function Lib:Loader(cfg)
 
     closeBtn.MouseButton1Click:Connect(function() L:Destroy() end)
 
-    local watchdog = nil
     function L:SetTimeout(sec)
         if watchdog then pcall(task.cancel, watchdog) end
         watchdog = task.delay(tonumber(sec) or 20, function()
@@ -2345,6 +2348,33 @@ function Lib:Loader(cfg)
         if closed then return end
         tintClose(P.danger)
         tween(closeBtn, 0.15, { BackgroundTransparency = 0.82 })
+    end
+
+    function L:Hide()
+        if closed then return end
+        if watchdog then
+            pcall(task.cancel, watchdog)
+            watchdog = nil
+        end
+        pcall(function() gui.Enabled = false end)
+        hidden = true
+    end
+
+    function L:Show()
+        if closed then return end
+        pcall(function() gui.Enabled = true end)
+        hidden = false
+    end
+
+    function L:IsHidden()
+        return hidden
+    end
+
+    function L:CancelTimeout()
+        if watchdog then
+            pcall(task.cancel, watchdog)
+            watchdog = nil
+        end
     end
 
     Lib.__loader = L
