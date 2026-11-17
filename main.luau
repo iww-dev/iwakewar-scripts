@@ -436,6 +436,8 @@ local function go()
     task.spawn(function()
         local b = lb()
         if not b then return end
+        if W.df() then return end
+        if D and D.gu and not D.gu.Parent then return end
         local L = pr(b, D and D.Hs or {})
         if not L then return end
         W.k = L
