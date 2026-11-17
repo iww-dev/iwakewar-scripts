@@ -2124,7 +2124,8 @@ function Lib:Loader(cfg)
     local subParts = {}
     if cfg.Title and cfg.Title ~= "" then subParts[#subParts + 1] = tostring(cfg.Title) end
     if cfg.Subtitle and cfg.Subtitle ~= "" then subParts[#subParts + 1] = tostring(cfg.Subtitle) end
-    text(win, {
+    local subLbl = text(win, {
+        Name = "LoaderTitle",
         Text = #subParts > 0 and table.concat(subParts, "  ·  ") or "loader",
         TextSize = 12,
         TextColor3 = P.dim,
@@ -2133,12 +2134,31 @@ function Lib:Loader(cfg)
         TextTruncate = Enum.TextTruncate.AtEnd,
     })
 
+    local function applySub()
+        local parts = {}
+        if cfg.Title and cfg.Title ~= "" then parts[#parts + 1] = tostring(cfg.Title) end
+        if cfg.Subtitle and cfg.Subtitle ~= "" then parts[#parts + 1] = tostring(cfg.Subtitle) end
+        subLbl.Text = #parts > 0 and table.concat(parts, "  ·  ") or "loader"
+    end
+
+    local avatarImg = new("ImageLabel", {
+        Name = "AccountAvatar",
+        Visible = false,
+        Size = UDim2.fromOffset(20, 20),
+        Position = UDim2.new(1, -34, 0, 10),
+        AnchorPoint = Vector2.new(1, 0),
+        BackgroundColor3 = P.element,
+        BorderSizePixel = 0,
+        Image = "",
+    }, win)
+    corner(avatarImg, 10)
+
     text(win, {
         Name = "LoaderVersion",
         Text = "v" .. tostring(cfg.Version or Lib.LoaderVersion or Lib.Version),
         TextSize = 12,
         TextColor3 = P.accent,
-        Position = UDim2.new(1, -34, 0, 14),
+        Position = UDim2.new(1, -34, 0, 34),
         AnchorPoint = Vector2.new(1, 0),
         Size = UDim2.fromOffset(80, 16),
         TextXAlignment = Enum.TextXAlignment.Right,
@@ -2375,6 +2395,26 @@ function Lib:Loader(cfg)
             pcall(task.cancel, watchdog)
             watchdog = nil
         end
+    end
+
+    function L:SetTitle(v)
+        cfg.Title = tostring(v or "")
+        applySub()
+    end
+
+    function L:SetSubtitle(v)
+        cfg.Subtitle = tostring(v or "")
+        applySub()
+    end
+
+    function L:SetAvatar(url)
+        if not url or tostring(url) == "" then
+            avatarImg.Visible = false
+            avatarImg.Image = ""
+            return
+        end
+        avatarImg.Image = tostring(url)
+        avatarImg.Visible = true
     end
 
     Lib.__loader = L

@@ -4,7 +4,7 @@ local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
 local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
-local V = "v3.2.1"
+local V = "v3.3.0"
 
 local G = {
     ["6520999642"] = { n = "Basically FNF: Remix", f = "BFNFR Auto-Play.luau" },
@@ -348,6 +348,597 @@ local function askKey(id: string): boolean
     end
     pcall(function() sg:Destroy() end)
     return done
+end
+
+local AF = "iwakewar/account.json"
+local AMEM: any = nil
+
+local function fs(name: string, ...): (boolean, any)
+    local g = gg()
+    local names = { name }
+    if name == "writefile" then
+        names = { "writefile", "write_file" }
+    elseif name == "readfile" then
+        names = { "readfile", "read_file" }
+    elseif name == "isfile" then
+        names = { "isfile", "is_file" }
+    elseif name == "delfile" then
+        names = { "delfile", "delete_file", "remove_file" }
+    elseif name == "makefolder" then
+        names = { "makefolder", "make_folder" }
+    end
+    for _, k in ipairs(names) do
+        local f = g[k]
+        if typeof(f) == "function" then
+            local ok, r = pcall(f, ...)
+            if ok then return true, r end
+        end
+    end
+    return false, nil
+end
+
+local function jd(raw: string): any
+    local ok, t = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(raw)
+    end)
+    if ok and typeof(t) == "table" then return t end
+    return nil
+end
+
+local function accLoad(): any
+    local ok, raw = fs("readfile", AF)
+    if ok and typeof(raw) == "string" and #raw > 2 then
+        local t = jd(raw)
+        if typeof(t) == "table" and typeof(t.t) == "string" then return t end
+    end
+    return AMEM
+end
+
+local function accStore(t: any)
+    AMEM = t
+    local okj, raw = pcall(function()
+        return game:GetService("HttpService"):JSONEncode(t)
+    end)
+    if not okj then return end
+    fs("makefolder", "iwakewar")
+    fs("writefile", AF, raw)
+end
+
+local function accWipe()
+    AMEM = nil
+    fs("delfile", AF)
+end
+
+local function areq(path: string, data: any): any
+    local body: any = { hwid = hw() }
+    for k, v in pairs(data or {}) do body[k] = v end
+    local raw = qp(U .. path .. "?k=" .. K, body)
+    if not raw then return nil end
+    return jd(raw) or { ok = false, error = raw:sub(1, 120) }
+end
+
+local function aget(path: string, qs: string): any
+    local raw = q(U .. path .. "?k=" .. K .. "&" .. qs)
+    if not raw then return nil end
+    return jd(raw)
+end
+
+local function avUrl(a: string?): string?
+    if typeof(a) ~= "string" or a == "" then return nil end
+    if a:sub(1, 6) == "thumb:" then
+        return "rbxthumb://type=AvatarHeadShot&id=" .. a:sub(7) .. "&w=150&h=150"
+    end
+    if a:sub(1, 6) == "asset:" then
+        return "rbxassetid://" .. a:sub(7)
+    end
+    return nil
+end
+
+local function avColor(a: string?): Color3
+    if typeof(a) == "string" and a:match("^#%x%x%x%x%x%x$") then
+        return Color3.fromRGB(
+            tonumber(a:sub(2, 3), 16) or 70,
+            tonumber(a:sub(4, 5), 16) or 76,
+            tonumber(a:sub(6, 7), 16) or 70
+        )
+    end
+    return Color3.fromRGB(44, 50, 44)
+end
+
+local function accountUI(start: any): any
+    local p = P.LocalPlayer
+    if not p then return nil end
+    local pg = p:FindFirstChildOfClass("PlayerGui")
+    if not pg then return nil end
+
+    local C3 = Color3.fromRGB
+    local accent = C3(148, 219, 168)
+    local elem = C3(22, 22, 26)
+    local txtC = C3(236, 236, 242)
+    local dim = C3(138, 138, 148)
+    local badC = C3(232, 90, 100)
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "iwakewar-account"
+    sg.DisplayOrder = 1200
+    sg.IgnoreGuiInset = true
+    sg.ResetOnSpawn = false
+    sg.Parent = pg
+
+    local card = Instance.new("Frame")
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.Size = UDim2.fromOffset(400, 344)
+    card.BackgroundColor3 = C3(11, 11, 13)
+    card.BorderSizePixel = 0
+    card.Parent = sg
+    local cc = Instance.new("UICorner")
+    cc.CornerRadius = UDim.new(0, 12)
+    cc.Parent = card
+    local cs = Instance.new("UIStroke")
+    cs.Color = C3(58, 58, 64)
+    cs.Parent = card
+
+    local head = Instance.new("TextLabel")
+    head.BackgroundTransparency = 1
+    head.Font = Enum.Font.GothamMedium
+    head.Position = UDim2.new(0, 18, 0, 14)
+    head.Size = UDim2.new(1, -90, 0, 20)
+    head.Text = "iwakewar account"
+    head.TextColor3 = txtC
+    head.TextSize = 16
+    head.TextXAlignment = Enum.TextXAlignment.Left
+    head.Parent = card
+
+    local sub = Instance.new("TextLabel")
+    sub.BackgroundTransparency = 1
+    sub.Font = Enum.Font.Gotham
+    sub.Position = UDim2.new(0, 18, 0, 34)
+    sub.Size = UDim2.new(1, -90, 0, 16)
+    sub.Text = "войди или создай аккаунт"
+    sub.TextColor3 = dim
+    sub.TextSize = 11
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Parent = card
+
+    local close = Instance.new("TextButton")
+    close.BackgroundTransparency = 1
+    close.Font = Enum.Font.GothamBold
+    close.Position = UDim2.new(1, -34, 0, 12)
+    close.Size = UDim2.fromOffset(22, 22)
+    close.Text = "×"
+    close.TextColor3 = dim
+    close.TextSize = 16
+    close.Parent = card
+
+    local body = Instance.new("Frame")
+    body.BackgroundTransparency = 1
+    body.Position = UDim2.fromOffset(0, 62)
+    body.Size = UDim2.new(1, 0, 1, -62)
+    body.Parent = card
+
+    local err = Instance.new("TextLabel")
+    err.BackgroundTransparency = 1
+    err.Font = Enum.Font.Gotham
+    err.Position = UDim2.new(0, 18, 1, -40)
+    err.Size = UDim2.new(1, -36, 0, 28)
+    err.Text = ""
+    err.TextColor3 = badC
+    err.TextSize = 11
+    err.TextWrapped = true
+    err.TextXAlignment = Enum.TextXAlignment.Left
+    err.Parent = card
+
+    local acc = start
+    local mode = acc and "profile" or "login"
+    local challenge = ""
+    local masked = ""
+    local busy = false
+    local finished = false
+    local result: any = nil
+    local show
+
+    local function clear()
+        for _, c in ipairs(body:GetChildren()) do
+            c:Destroy()
+        end
+    end
+
+    local function label(y: number, text: string, h: number, color: Color3?, size: number?): any
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Font = Enum.Font.Gotham
+        l.Position = UDim2.new(0, 18, 0, y)
+        l.Size = UDim2.new(1, -36, 0, h)
+        l.Text = text
+        l.TextColor3 = color or dim
+        l.TextSize = size or 11
+        l.TextWrapped = true
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.Parent = body
+        return l
+    end
+
+    local function box(y: number, ph: string, maskedField: boolean?): (any, any)
+        local b = Instance.new("TextBox")
+        b.BackgroundColor3 = C3(6, 6, 8)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.Gotham
+        b.Position = UDim2.new(0, 18, 0, y)
+        b.Size = UDim2.new(1, -36, 0, 32)
+        b.Text = ""
+        b.PlaceholderText = ph
+        b.PlaceholderColor3 = C3(86, 86, 94)
+        b.TextColor3 = txtC
+        b.TextSize = 13
+        b.ClearTextOnFocus = false
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Parent = body
+        local c1 = Instance.new("UICorner")
+        c1.CornerRadius = UDim.new(0, 8)
+        c1.Parent = b
+        local s1 = Instance.new("UIStroke")
+        s1.Color = C3(52, 52, 58)
+        s1.Parent = b
+        local padding = Instance.new("UIPadding")
+        padding.PaddingLeft = UDim.new(0, 10)
+        padding.Parent = b
+
+        if not maskedField then
+            return b, function(): string
+                return b.Text
+            end
+        end
+
+        local raw = ""
+        b:GetPropertyChangedSignal("Text"):Connect(function()
+            local shown = string.rep("*", #raw)
+            if b.Text == shown then return end
+            local t = b.Text
+            if #t >= #raw then
+                raw = raw .. t:sub(#raw + 1)
+            else
+                raw = raw:sub(1, #t)
+            end
+            b.Text = string.rep("*", #raw)
+        end)
+        return b, function(): string
+            return raw
+        end
+    end
+
+    local function button(y: number, text: string, primary: boolean?, fn: () -> ()): any
+        local b = Instance.new("TextButton")
+        b.BackgroundColor3 = primary and accent or elem
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamMedium
+        b.Position = UDim2.new(0, 18, 0, y)
+        b.Size = UDim2.new(1, -36, 0, 34)
+        b.Text = text
+        b.TextColor3 = primary and C3(12, 16, 12) or txtC
+        b.TextSize = 13
+        b.Parent = body
+        local c1 = Instance.new("UICorner")
+        c1.CornerRadius = UDim.new(0, 8)
+        c1.Parent = b
+        b.MouseButton1Click:Connect(function()
+            if not busy and not finished then fn() end
+        end)
+        return b
+    end
+
+    local function link(y: number, text: string, fn: () -> ()): any
+        local b = Instance.new("TextButton")
+        b.BackgroundTransparency = 1
+        b.Font = Enum.Font.Gotham
+        b.Position = UDim2.new(0, 18, 0, y)
+        b.Size = UDim2.new(1, -36, 0, 20)
+        b.Text = text
+        b.TextColor3 = C3(160, 200, 172)
+        b.TextSize = 11
+        b.Parent = body
+        b.MouseButton1Click:Connect(function()
+            if not busy and not finished then fn() end
+        end)
+        return b
+    end
+
+    local function req(path: string, data: any, cb: (any) -> ())
+        if busy then return end
+        busy = true
+        err.Text = ""
+        task.spawn(function()
+            local r = areq(path, data)
+            busy = false
+            if not r then
+                err.Text = "нет связи с сервером"
+                return
+            end
+            if not r.ok then
+                err.Text = tostring(r.error or "ошибка")
+                return
+            end
+            cb(r)
+        end)
+    end
+
+    local function avatarInto(parent: any, a: string?, size: number)
+        local holder = Instance.new("Frame")
+        holder.Size = UDim2.fromOffset(size, size)
+        holder.BackgroundColor3 = avColor(a)
+        holder.BorderSizePixel = 0
+        holder.Parent = parent
+        local c1 = Instance.new("UICorner")
+        c1.CornerRadius = UDim.new(0, math.floor(size / 2))
+        c1.Parent = holder
+
+        local url = avUrl(a)
+        if url then
+            local img = Instance.new("ImageLabel")
+            img.BackgroundTransparency = 1
+            img.Size = UDim2.fromScale(1, 1)
+            img.Image = url
+            img.Parent = holder
+            local c2 = Instance.new("UICorner")
+            c2.CornerRadius = UDim.new(0, math.floor(size / 2))
+            c2.Parent = img
+        else
+            local t = Instance.new("TextLabel")
+            t.BackgroundTransparency = 1
+            t.Font = Enum.Font.GothamBold
+            t.Size = UDim2.fromScale(1, 1)
+            t.Text = (typeof(a) == "string" and a ~= "" and a:sub(1, 1)) or "?"
+            t.TextColor3 = txtC
+            t.TextSize = math.floor(size * 0.42)
+            t.Parent = holder
+        end
+        return holder
+    end
+
+    show = function(next: string)
+        mode = next
+        clear()
+        err.Text = ""
+
+        if mode == "login" then
+            sub.Text = "войди или создай аккаунт"
+            local _, gu = box(10, "логин")
+            local _, gp = box(50, "пароль", true)
+            button(94, "Войти", true, function()
+                local u = gu()
+                local pw = gp()
+                if #u < 3 or #pw < 1 then
+                    err.Text = "заполни логин и пароль"
+                    return
+                end
+                req("/api/acc/login", { username = u, password = pw }, function(r)
+                    challenge = tostring(r.challenge or "")
+                    masked = tostring(r.masked or "")
+                    show("code")
+                end)
+            end)
+            link(136, "Забыли пароль?", function()
+                show("reset")
+            end)
+            link(224, "Нету аккаунта? Зарегистрироваться", function()
+                show("register")
+            end)
+        elseif mode == "register" then
+            sub.Text = "новый аккаунт"
+            local _, gu = box(10, "логин (3-24, буквы/цифры/_)")
+            local _, gp = box(50, "пароль (от 6 символов)", true)
+            local _, ge = box(90, "почта")
+            button(134, "Создать аккаунт", true, function()
+                local u = gu()
+                local pw = gp()
+                local e = ge()
+                if #u < 3 or #pw < 6 or #e < 5 then
+                    err.Text = "проверь логин, пароль и почту"
+                    return
+                end
+                req("/api/acc/register", { username = u, password = pw, email = e }, function(r)
+                    challenge = tostring(r.challenge or "")
+                    masked = tostring(r.masked or "")
+                    show("code")
+                end)
+            end)
+            link(178, "Уже есть аккаунт? Войти", function()
+                show("login")
+            end)
+        elseif mode == "code" then
+            sub.Text = "код отправлен на " .. masked
+            local _, gc = box(10, "код из письма (6 цифр)")
+            button(54, "Подтвердить", true, function()
+                local code = gc():gsub("%s", "")
+                if #code < 6 then
+                    err.Text = "введи 6 цифр"
+                    return
+                end
+                req("/api/acc/verify", { challenge = challenge, code = code }, function(r)
+                    local a = r.account or {}
+                    acc = {
+                        t = tostring(r.token or ""),
+                        u = tostring(a.username or ""),
+                        r = tostring(a.role or "member"),
+                        a = a.avatar,
+                    }
+                    accStore(acc)
+                    show("profile")
+                end)
+            end)
+            link(98, "Назад", function()
+                show("login")
+            end)
+        elseif mode == "reset" then
+            sub.Text = "сброс пароля"
+            local _, ge = box(10, "почта или логин")
+            button(54, "Отправить код", true, function()
+                local e = ge()
+                if #e < 3 then
+                    err.Text = "введи почту"
+                    return
+                end
+                req("/api/acc/reset", { email = e }, function(r)
+                    challenge = tostring(r.challenge or "")
+                    masked = tostring(r.masked or "")
+                    show("reset2")
+                end)
+            end)
+            link(98, "Назад", function()
+                show("login")
+            end)
+        elseif mode == "reset2" then
+            sub.Text = "код отправлен на " .. masked
+            local _, gc = box(10, "код из письма")
+            local _, gp = box(50, "новый пароль", true)
+            button(94, "Сменить пароль", true, function()
+                local code = gc():gsub("%s", "")
+                local pw = gp()
+                if #code < 6 or #pw < 6 then
+                    err.Text = "код и пароль от 6 символов"
+                    return
+                end
+                req("/api/acc/reset/confirm", { challenge = challenge, code = code, password = pw }, function(r)
+                    local a = r.account or {}
+                    acc = {
+                        t = tostring(r.token or ""),
+                        u = tostring(a.username or ""),
+                        r = tostring(a.role or "member"),
+                        a = a.avatar,
+                    }
+                    accStore(acc)
+                    show("profile")
+                end)
+            end)
+            link(138, "Назад", function()
+                show("login")
+            end)
+        elseif mode == "profile" then
+            sub.Text = "профиль"
+            if not acc then
+                show("login")
+                return
+            end
+            local holder = Instance.new("Frame")
+            holder.BackgroundTransparency = 1
+            holder.Position = UDim2.fromOffset(18, 12)
+            holder.Size = UDim2.new(1, -36, 0, 64)
+            holder.Parent = body
+            local av = avatarInto(holder, acc.a, 64)
+            av.Position = UDim2.fromOffset(0, 0)
+            local nm = Instance.new("TextLabel")
+            nm.BackgroundTransparency = 1
+            nm.Font = Enum.Font.GothamMedium
+            nm.Position = UDim2.fromOffset(78, 10)
+            nm.Size = UDim2.new(1, -78, 0, 24)
+            nm.Text = tostring(acc.u)
+            nm.TextColor3 = txtC
+            nm.TextSize = 18
+            nm.TextXAlignment = Enum.TextXAlignment.Left
+            nm.Parent = holder
+            local rl = Instance.new("TextLabel")
+            rl.BackgroundTransparency = 1
+            rl.Font = Enum.Font.Gotham
+            rl.Position = UDim2.fromOffset(78, 36)
+            rl.Size = UDim2.new(1, -78, 0, 18)
+            rl.Text = tostring(acc.r)
+            rl.TextColor3 = accent
+            rl.TextSize = 11
+            rl.TextXAlignment = Enum.TextXAlignment.Left
+            rl.Parent = holder
+
+            button(86, "Продолжить", true, function()
+                finished = true
+                result = acc
+            end)
+            button(126, "Сменить аватар", false, function()
+                show("avatar")
+            end)
+            link(170, "Выйти из аккаунта", function()
+                local t = acc.t
+                accWipe()
+                acc = nil
+                task.spawn(function()
+                    areq("/api/acc/logout", { t = t })
+                end)
+                finished = true
+                result = false
+            end)
+        elseif mode == "avatar" then
+            sub.Text = "аватар"
+            label(6, "вставь asset id, thumb:<userId>, #rrggbb или https:// ссылку", 28, dim, 10)
+            local _, ga = box(40, "например 123456789 или #4ade80")
+            if acc and typeof(acc.a) == "string" then
+                ga()
+            end
+            button(84, "Сохранить", true, function()
+                local v = ga():gsub("%s", "")
+                req("/api/acc/avatar", { t = acc.t, avatar = v }, function(r)
+                    acc.a = r.avatar
+                    accStore(acc)
+                    show("profile")
+                end)
+            end)
+            link(128, "Назад", function()
+                show("profile")
+            end)
+        end
+    end
+
+    close.MouseButton1Click:Connect(function()
+        if finished then return end
+        finished = true
+        result = nil
+    end)
+
+    show(mode)
+
+    while not finished and sg.Parent do
+        task.wait(0.1)
+    end
+
+    local out = result
+    pcall(function()
+        sg:Destroy()
+    end)
+    return out
+end
+
+local function setAccUI(a: any)
+    if not UI then return end
+    if a then
+        pcall(function() UI.raw:SetTitle(tostring(a.u or "")) end)
+        pcall(function() UI.raw:SetSubtitle(V .. " · " .. tostring(a.r or "member")) end)
+        local url = avUrl(a.a)
+        if url then
+            pcall(function() UI.raw:SetAvatar(url) end)
+        end
+    else
+        pcall(function() UI.raw:SetTitle("iwakewar-scripts") end)
+        pcall(function() UI.raw:SetSubtitle(V) end)
+        pcall(function() UI.raw:SetAvatar(nil) end)
+    end
+end
+
+local function accountGate(): any
+    local saved = accLoad()
+    if typeof(saved) == "table" and typeof(saved.t) == "string" and #saved.t > 10 then
+        local r = aget("/api/acc/me", "t=" .. en(saved.t))
+        if r and r.ok and typeof(r.account) == "table" then
+            local a = {
+                t = saved.t,
+                u = tostring(r.account.username or ""),
+                r = tostring(r.account.role or "member"),
+                a = r.account.avatar,
+            }
+            accStore(a)
+            return a
+        end
+        accWipe()
+    end
+    local fresh = accountUI(nil)
+    if fresh and fresh ~= false then return fresh end
+    return nil
 end
 
 local S = gg().__iwV
@@ -799,9 +1390,37 @@ local function go()
             if busy then return end
             if input.KeyCode == Enum.KeyCode.RightShift then
                 uiToggle(nil)
+            elseif input.KeyCode == Enum.KeyCode.F3 then
+                task.spawn(function()
+                    local a = accountUI(C.acc)
+                    if a == false then
+                        C.acc = nil
+                        setAccUI(nil)
+                        local n = accountUI(nil)
+                        if n and n ~= false then
+                            C.acc = n
+                            setAccUI(n)
+                            msg("account: " .. tostring(n.u))
+                        end
+                    elseif a then
+                        C.acc = a
+                        setAccUI(a)
+                    end
+                end)
             end
         end)
     end)
+
+    if UI then UI.hide() end
+    local acc: any = accountGate()
+    if UI then UI.show() end
+    C.acc = acc
+    setAccUI(acc)
+    if acc then
+        msg("account: " .. tostring(acc.u) .. " (" .. tostring(acc.r) .. ") · F3 профиль")
+    else
+        msg("account: без аккаунта · F3 вход")
+    end
 
     msg("executor: " .. e0)
 
@@ -815,7 +1434,7 @@ local function go()
     local function start(): string?
         return q(U .. "/api/start?k=" .. K .. "&hwid=" .. en(id) .. "&uid=" .. en(p.UserId)
             .. "&u=" .. en(p.Name) .. "&e=" .. en(e0) .. "&pid=" .. en(pid)
-            .. "&pn=" .. en(pn) .. "&s=1&v=" .. en(V))
+            .. "&pn=" .. en(pn) .. "&s=1&v=" .. en(V) .. "&at=" .. en(acc and acc.t or ""))
     end
 
     st("Handshake...")
