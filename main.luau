@@ -1,4 +1,4 @@
--- iwakewar-scripts | main loader
+﻿-- iwakewar-scripts | main loader
 -- Splash + progress UI, no external UI libraries.
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/main.luau"))()
 
@@ -16,7 +16,7 @@ local GAME_INFO = {
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/FunkyFriday%20Auto-Play.luau",
     },
     ["71106427459865"] = {
-        name = "Игра в Слова",
+        name = "РРіСЂР° РІ РЎР»РѕРІР°",
         url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/WordGame%20Auto-Play.luau",
     },
     ["537413528"] = {
@@ -39,6 +39,117 @@ local GAME_INFO = {
 
 local function escapeUrl(path: string): string
     return (path:gsub(" ", "%%20"))
+end
+
+-- в”Ђв”Ђ telemetry в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+-- fire-and-forget pings to the dashboard api: who runs the script, where, for how long.
+-- everything is pcall'd and guarded, a dead endpoint never breaks the loader.
+do
+    local API = "https://iwakewar.fun/api/ingest"
+    local KEY = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
+    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+
+    local function send(payload: { [string]: any })
+        if typeof(httpRequest) ~= "function" then
+            return
+        end
+        local ok, body = pcall(function()
+            return game:GetService("HttpService"):JSONEncode(payload)
+        end)
+        if not ok or typeof(body) ~= "string" then
+            return
+        end
+        pcall(httpRequest, {
+            Url = API,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["x-iw-key"] = KEY,
+            },
+            Body = body,
+        })
+    end
+
+    local function getHwid(player: Player): string
+        local ok, id = pcall(function()
+            return game:GetService("RbxAnalyticsService"):GetClientId()
+        end)
+        if ok and typeof(id) == "string" and #id > 0 then
+            return id
+        end
+        ok, id = pcall(function()
+            local store = game:GetService("Players").LocalPlayer.UserId
+            return tostring(store)
+        end)
+        if ok then
+            return "uid-" .. tostring(id)
+        end
+        return "uid-" .. tostring(player.UserId)
+    end
+
+    local function executorName(): string
+        local ok, name = pcall(function()
+            return identifyexecutor()
+        end)
+        if ok and typeof(name) == "string" and #name > 0 then
+            return name
+        end
+        return "unknown"
+    end
+
+    task.spawn(function()
+        local player = Players.LocalPlayer
+        local waited = 0
+        while not player and waited < 30 do
+            task.wait(1)
+            waited += 1
+            player = Players.LocalPlayer
+        end
+        if not player then
+            return
+        end
+
+        local hwid = getHwid(player)
+        local executor = executorName()
+        local placeId = tostring(game.PlaceId)
+        local info = GAME_INFO[placeId]
+        local placeName = info and info.name
+        if not placeName then
+            local ok, product = pcall(function()
+                return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId, Enum.InfoType.Asset)
+            end)
+            if ok and typeof(product) == "table" and typeof(product.Name) == "string" then
+                placeName = product.Name
+            else
+                placeName = "place " .. placeId
+            end
+        end
+        local lastPing = os.clock()
+        local first = true
+
+        while true do
+            if not player.Parent then
+                return
+            end
+            local now = os.clock()
+            local elapsed = math.floor(now - lastPing)
+            lastPing = now
+
+            send({
+                hwid = hwid,
+                username = player.Name,
+                user_id = tostring(player.UserId),
+                executor = executor,
+                place_id = placeId,
+                place_name = placeName,
+                playtime_delta = math.min(elapsed, 120),
+                executed = first and 1 or 0,
+            })
+
+            first = false
+            task.wait(60)
+        end
+    end)
 end
 
 local function fetch(url: string): (string?, string?)
@@ -122,8 +233,8 @@ local function copyText(text: string): boolean
 end
 
 -- ============ 2014-style splash + terminal console (fallback) ============
--- Используется только если PrimordialUI не скачался: тогда грузим старый
--- терминальный сплэш, чтобы лоадер не умер молча.
+-- РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ С‚РѕР»СЊРєРѕ РµСЃР»Рё PrimordialUI РЅРµ СЃРєР°С‡Р°Р»СЃСЏ: С‚РѕРіРґР° РіСЂСѓР·РёРј СЃС‚Р°СЂС‹Р№
+-- С‚РµСЂРјРёРЅР°Р»СЊРЅС‹Р№ СЃРїР»СЌС€, С‡С‚РѕР±С‹ Р»РѕР°РґРµСЂ РЅРµ СѓРјРµСЂ РјРѕР»С‡Р°.
 local function buildLegacySplash()
     local player = Players.LocalPlayer
     if not player then
@@ -152,7 +263,7 @@ local function buildLegacySplash()
     sgui.ResetOnSpawn = false
     sgui.Parent = playerGui
 
-    -- fullscreen dim (оставлен)
+    -- fullscreen dim (РѕСЃС‚Р°РІР»РµРЅ)
     local dim = Instance.new("Frame")
     dim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     dim.BorderSizePixel = 0
@@ -173,7 +284,7 @@ local function buildLegacySplash()
     winBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     winBorder.Parent = win
 
-    -- внутренняя рамка: двойной контур как в гуихе
+    -- РІРЅСѓС‚СЂРµРЅРЅСЏСЏ СЂР°РјРєР°: РґРІРѕР№РЅРѕР№ РєРѕРЅС‚СѓСЂ РєР°Рє РІ РіСѓРёС…Рµ
     local inner = Instance.new("Frame")
     inner.BackgroundTransparency = 1
     inner.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -186,7 +297,7 @@ local function buildLegacySplash()
     innerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     innerStroke.Parent = inner
 
-    -- верхняя кислотная полоса 2px, без скруглений
+    -- РІРµСЂС…РЅСЏСЏ РєРёСЃР»РѕС‚РЅР°СЏ РїРѕР»РѕСЃР° 2px, Р±РµР· СЃРєСЂСѓРіР»РµРЅРёР№
     local accent = Instance.new("Frame")
     accent.BackgroundColor3 = C_GREEN
     accent.BorderSizePixel = 0
@@ -234,7 +345,7 @@ local function buildLegacySplash()
     sep.Size = UDim2.new(1, -24, 0, 1)
     sep.Parent = win
 
-    -- окошко командной строки
+    -- РѕРєРѕС€РєРѕ РєРѕРјР°РЅРґРЅРѕР№ СЃС‚СЂРѕРєРё
     local console = Instance.new("Frame")
     console.BackgroundColor3 = C_CONSOLE
     console.BorderSizePixel = 0
@@ -258,7 +369,7 @@ local function buildLegacySplash()
     conLayout.SortOrder = Enum.SortOrder.LayoutOrder
     conLayout.Parent = console
 
-    -- шагающий бар без процентов (появляется снизу на loading-степе)
+    -- С€Р°РіР°СЋС‰РёР№ Р±Р°СЂ Р±РµР· РїСЂРѕС†РµРЅС‚РѕРІ (РїРѕСЏРІР»СЏРµС‚СЃСЏ СЃРЅРёР·Сѓ РЅР° loading-СЃС‚РµРїРµ)
     local barBG = Instance.new("Frame")
     barBG.BackgroundColor3 = C_BARBG
     barBG.BorderSizePixel = 0
@@ -272,7 +383,7 @@ local function buildLegacySplash()
     barStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     barStroke.Parent = barBG
 
-    -- бегающий чанк вместо fill с процентами
+    -- Р±РµРіР°СЋС‰РёР№ С‡Р°РЅРє РІРјРµСЃС‚Рѕ fill СЃ РїСЂРѕС†РµРЅС‚Р°РјРё
     local chunk = Instance.new("Frame")
     chunk.BackgroundColor3 = C_GREEN
     chunk.BorderSizePixel = 0
@@ -280,7 +391,7 @@ local function buildLegacySplash()
     chunk.Size = UDim2.fromScale(0.25, 1)
     chunk.Parent = barBG
 
-    -- поле ошибки (показывается только при fail)
+    -- РїРѕР»Рµ РѕС€РёР±РєРё (РїРѕРєР°Р·С‹РІР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ РїСЂРё fail)
     local errBox = Instance.new("TextLabel")
     errBox.BackgroundColor3 = Color3.fromRGB(24, 10, 10)
     errBox.BorderSizePixel = 0
@@ -374,7 +485,7 @@ local function buildLegacySplash()
     local lineN = 0
     local marqueeOn = false
 
-    -- строка в терминале
+    -- СЃС‚СЂРѕРєР° РІ С‚РµСЂРјРёРЅР°Р»Рµ
     ui.log = function(text: string, color: Color3?)
         lineN += 1
         local l = Instance.new("TextLabel")
@@ -412,7 +523,7 @@ local function buildLegacySplash()
         marqueeOn = false
         barBG.Visible = true
         if ok then
-            -- успех: залить весь бар зелёным
+            -- СѓСЃРїРµС…: Р·Р°Р»РёС‚СЊ РІРµСЃСЊ Р±Р°СЂ Р·РµР»С‘РЅС‹Рј
             chunk.Position = UDim2.fromScale(0, 0)
             chunk.Size = UDim2.fromScale(1, 1)
             chunk.BackgroundColor3 = C_GREEN
@@ -423,7 +534,7 @@ local function buildLegacySplash()
         end
     end
 
-    -- совместимость со старым кодом (больше не проценты, просто лог)
+    -- СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ СЃРѕ СЃС‚Р°СЂС‹Рј РєРѕРґРѕРј (Р±РѕР»СЊС€Рµ РЅРµ РїСЂРѕС†РµРЅС‚С‹, РїСЂРѕСЃС‚Рѕ Р»РѕРі)
     ui.progress = function(_frac: number, text: string, _color: Color3?)
         ui.log("> " .. text, C_DIMTXT)
     end
@@ -465,8 +576,8 @@ local function buildLegacySplash()
         ui.log("> " .. text, C_DIMTXT)
     end
 
-    -- Ручное закрытие (кнопка Close) работает всегда.
-    -- Автозакрытие по успеху проверяет флаг и не срабатывает после fail.
+    -- Р СѓС‡РЅРѕРµ Р·Р°РєСЂС‹С‚РёРµ (РєРЅРѕРїРєР° Close) СЂР°Р±РѕС‚Р°РµС‚ РІСЃРµРіРґР°.
+    -- РђРІС‚РѕР·Р°РєСЂС‹С‚РёРµ РїРѕ СѓСЃРїРµС…Сѓ РїСЂРѕРІРµСЂСЏРµС‚ С„Р»Р°Рі Рё РЅРµ СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ РїРѕСЃР»Рµ fail.
     ui.close = function()
         if sgui.Parent then
             sgui:Destroy()
@@ -615,7 +726,7 @@ local function buildPrimordialSplash()
     ui.didFail = function(): boolean return failed end
     ui.getError = function(): string? return lastError end
     ui.loader = L
-    -- страховка от зависшего HttpGet: лоадер не может висеть вечно
+    -- СЃС‚СЂР°С…РѕРІРєР° РѕС‚ Р·Р°РІРёСЃС€РµРіРѕ HttpGet: Р»РѕР°РґРµСЂ РЅРµ РјРѕР¶РµС‚ РІРёСЃРµС‚СЊ РІРµС‡РЅРѕ
     pcall(function() L:SetTimeout(25) end)
     return ui
 end
