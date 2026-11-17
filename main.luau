@@ -1,27 +1,38 @@
 -- iwakewar-scripts | main loader
 -- Splash + progress UI, no external UI libraries.
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/main.luau"))()
+-- loadstring(game:HttpGet("https://iwakewar.fun/scripts/main.luau?k=5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"))()
 
 local Players = game:GetService("Players")
 
-local BASE = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/"
+local SITE = "https://iwakewar.fun"
+local KEY = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
+local DATA_KEY = "iwakewar-scripts-v1"
+local BASE = SITE .. "/scripts/"
+
+local function escapeUrl(path: string): string
+    return (path:gsub(" ", "%%20"))
+end
+
+local function scriptUrl(path: string): string
+    return BASE .. escapeUrl(path) .. "?k=" .. KEY
+end
 
 local GAME_INFO = {
     ["6520999642"] = {
         name = "Basically FNF: Remix",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BFNFR%20Auto-Play.luau",
+        url = scriptUrl("BFNFR Auto-Play.luau"),
     },
     ["6447798030"] = {
         name = "Funky Friday",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/FunkyFriday%20Auto-Play.luau",
+        url = scriptUrl("FunkyFriday Auto-Play.luau"),
     },
     ["71106427459865"] = {
         name = "Игра в Слова",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/WordGame%20Auto-Play.luau",
+        url = scriptUrl("WordGame Auto-Play.luau"),
     },
     ["537413528"] = {
         name = "Build A Boat For Treasure",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/BABFT.luau",
+        url = scriptUrl("BABFT.luau"),
     },
     -- UnAim is written against Scoped FPS internals (ReplicatedStorage.Utils.CameraController
     -- for the camera / GetAimRay, ReplicatedStorage.GameMode.MatchQuery for the team model),
@@ -29,16 +40,110 @@ local GAME_INFO = {
     -- integration layer before being added here.
     ["93466613073564"] = {
         name = "Scoped FPS",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/UnAim.luau",
+        url = scriptUrl("UnAim.luau"),
     },
     ["114689356953798"] = {
         name = "Scoped FPS",
-        url = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/UnAim.luau",
+        url = scriptUrl("UnAim.luau"),
     },
 }
 
-local function escapeUrl(path: string): string
-    return (path:gsub(" ", "%%20"))
+-- ── hardban preflight ─────────────────────────────────────────────────────
+-- runs before anything is downloaded, drawn or executed. if the device, ip or
+-- account is hardbanned the loader just refuses to do anything at all.
+do
+    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+
+    local okId, clientId = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    local hwid = (okId and typeof(clientId) == "string") and clientId or ""
+
+    local player = Players.LocalPlayer
+    local waited = 0
+    while not player and waited < 10 do
+        task.wait(0.5)
+        waited += 1
+        player = Players.LocalPlayer
+    end
+
+    if #hwid == 0 and player then
+        hwid = "uid-" .. tostring(player.UserId)
+    end
+
+    local function urlencode(value: string): string
+        local out = {}
+        for i = 1, #value do
+            local c = value:sub(i, i)
+            local b = string.byte(c)
+            local safe = (b >= 48 and b <= 57)
+                or (b >= 65 and b <= 90)
+                or (b >= 97 and b <= 122)
+                or b == 45
+                or b == 46
+                or b == 95
+                or b == 126
+            if safe then
+                out[#out + 1] = c
+            else
+                out[#out + 1] = string.format("%%%02X", b)
+            end
+        end
+        return table.concat(out)
+    end
+
+    if #hwid > 0 then
+        local checkUrl = SITE
+            .. "/api/check?k=" .. KEY
+            .. "&hwid=" .. urlencode(hwid)
+            .. "&user_id=" .. urlencode(player and tostring(player.UserId) or "")
+            .. "&username=" .. urlencode(player and player.Name or "")
+
+        local body = nil
+        if typeof(httpRequest) == "function" then
+            local ok, res = pcall(httpRequest, {
+                Url = checkUrl,
+                Method = "GET",
+                Headers = { ["x-iw-key"] = KEY },
+            })
+            if ok then
+                body = typeof(res) == "table" and res.Body or res
+            end
+        else
+            local ok, res = pcall(function()
+                return game:HttpGet(checkUrl)
+            end)
+            if ok then
+                body = res
+            end
+        end
+
+        if typeof(body) == "string" and body:find('"banned"%s*:%s*true') then
+            warn("[iwakewar-scripts] access denied: this device / account is hardbanned")
+            return
+        end
+    end
+end
+
+-- ── script decoding ───────────────────────────────────────────────────────
+-- game scripts are uploaded xor-encoded as hex so a random person cannot just
+-- open the url and read the source.
+local function decodeSource(data: string): string?
+    if #data < 2 or #data % 2 ~= 0 then
+        return nil
+    end
+    local out = table.create(#data // 2)
+    local klen = #DATA_KEY
+    for i = 1, #data, 2 do
+        local byte = tonumber(data:sub(i, i + 1), 16)
+        if not byte then
+            return nil
+        end
+        local idx = #out + 1
+        local k = string.byte(DATA_KEY, (idx - 1) % klen + 1)
+        out[idx] = string.char(bit32.bxor(byte, k))
+    end
+    return table.concat(out)
 end
 
 -- ── telemetry ─────────────────────────────────────────────────────────────
@@ -46,7 +151,6 @@ end
 -- everything is pcall'd and guarded, a dead endpoint never breaks the loader.
 do
     local API = "https://iwakewar.fun/api/ingest"
-    local KEY = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
     local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
 
     local function send(payload: { [string]: any })
@@ -203,7 +307,8 @@ local function getExecutorName(): string
     local name = "unknown"
     pcall(function()
         if typeof(identifyexecutor) == "function" then
-            name = tostring(identifyexecutor())
+            local execName = identifyexecutor()
+            name = tostring(execName)
         end
     end)
     return name
@@ -602,7 +707,12 @@ local function runWithoutSplash()
         warn("[iwakewar-scripts] could not fetch " .. info.url .. " | " .. tostring(ferr))
         return
     end
-    local ok, rerr = runSource(src, info.name)
+    local decoded = decodeSource(src)
+    if not decoded then
+        warn("[iwakewar-scripts] could not decode " .. info.url)
+        return
+    end
+    local ok, rerr = runSource(decoded, info.name)
     if not ok then
         warn("[iwakewar-scripts] " .. tostring(rerr))
     end
@@ -630,6 +740,12 @@ local function loadWithSplash(ui)
         ui.fail("Failed to download script.", tostring(ferr) .. " :: " .. info.url)
         return
     end
+    local decoded = decodeSource(src)
+    if not decoded then
+        ui.fail("Failed to decode script.", info.url)
+        return
+    end
+    src = decoded
     ui.log(string.format("GET %s (%.1f KB)", info.name, #src / 1024))
     ui.progress(0.72, "Injecting...")
     task.wait(0.15)
@@ -647,12 +763,22 @@ local function loadWithSplash(ui)
 end
 
 -- ============ Primordial splash (our own gui-lib) ============
-local LIB_URL = BASE .. "gui-lib/PrimordialUI.luau"
+local LIB_URL = scriptUrl("gui-lib/PrimordialUI.luau")
 
 local function loadPrimordial(): any
     if typeof(loadstring) ~= "function" then return nil end
+    local src, ferr = fetch(LIB_URL)
+    if not src then
+        warn("[iwakewar-scripts] PrimordialUI unavailable: " .. tostring(ferr))
+        return nil
+    end
+    local decoded = decodeSource(src)
+    if not decoded then
+        warn("[iwakewar-scripts] PrimordialUI unavailable: decode failed")
+        return nil
+    end
     local ok, res = pcall(function()
-        return loadstring(game:HttpGet(LIB_URL))()
+        return loadstring(decoded)()
     end)
     if ok and typeof(res) == "table" and typeof(res.Loader) == "function" then
         return res
