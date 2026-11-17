@@ -114,7 +114,7 @@ end
 local function lb(): any
     local g = gg()
     if typeof(g.__iwL) == "table" then return g.__iwL end
-    local s = q(R .. "gui-lib/PrimordialUI.luau")
+    local s = q(R .. "gui-lib/PrimordialUI.luau?v=" .. V)
     if not s or #s < 100 then
         s = q(B .. "gui-lib/PrimordialUI.luau?k=" .. K)
     end
