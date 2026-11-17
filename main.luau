@@ -106,6 +106,7 @@ do
         local executor = executorName()
         local placeId = tostring(game.PlaceId)
         local info = GAME_INFO[placeId]
+        local supported = info ~= nil
         local placeName = info and info.name
         if not placeName then
             local ok, product = pcall(function()
@@ -136,6 +137,7 @@ do
                 executor = executor,
                 place_id = placeId,
                 place_name = placeName,
+                supported = supported,
                 playtime_delta = math.min(elapsed, 120),
                 executed = first and 1 or 0,
             })
