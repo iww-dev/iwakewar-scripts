@@ -4,12 +4,12 @@ local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
 local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
-local V = "v3.3.1"
+local V = "v3.3.2"
 
 local G = {
     ["6520999642"] = { n = "Basically FNF: Remix", f = "BFNFR Auto-Play.luau" },
     ["6447798030"] = { n = "Funky Friday", f = "FunkyFriday Auto-Play.luau" },
-    ["71106427459865"] = { n = "РРіСЂР° РІ РЎР»РѕРІР°", f = "WordGame Auto-Play.luau" },
+    ["71106427459865"] = { n = "Игра в Слова", f = "WordGame Auto-Play.luau" },
     ["537413528"] = { n = "Build A Boat For Treasure", f = "BABFT.luau" },
     ["93466613073564"] = { n = "Scoped FPS", f = "UnAim.luau" },
     ["114689356953798"] = { n = "Scoped FPS", f = "UnAim.luau" },
@@ -424,6 +424,40 @@ local function aget(path: string, qs: string): any
     return jd(raw)
 end
 
+local function avHash(s: string): string
+    local h1, h2 = 5381, 52711
+    for i = 1, #s do
+        local b = s:byte(i)
+        h1 = (h1 * 33 + b) % 4294967296
+        h2 = (h2 * 31 + b) % 4294967296
+    end
+    return string.format("%08x%08x", h1, h2)
+end
+
+-- roblox cannot render arbitrary https images, but most executors can turn a
+-- local file into an rbxasset:// path (getcustomasset / getcustomasset)
+local function localAsset(u: string): string?
+    local g = gg()
+    local conv = g.getcustomasset or g.getcustomasset
+    if typeof(conv) ~= "function" then return nil end
+
+    local dir = "iwakewar/cache"
+    local file = dir .. "/av_" .. avHash(u) .. ".img"
+    local have = false
+    pcall(function() have = isfile(file) end)
+    if not have then
+        local data = q(u)
+        if not data or #data < 64 then return nil end
+        pcall(function() makefolder("iwakewar"); makefolder(dir) end)
+        local okW = pcall(function() writefile(file, data) end)
+        if not okW then return nil end
+    end
+
+    local ok, path = pcall(conv, file)
+    if ok and typeof(path) == "string" and path ~= "" then return path end
+    return nil
+end
+
 local function avUrl(a: string?): string?
     if typeof(a) ~= "string" or a == "" then return nil end
     if a:sub(1, 6) == "thumb:" then
@@ -431,6 +465,9 @@ local function avUrl(a: string?): string?
     end
     if a:sub(1, 6) == "asset:" then
         return "rbxassetid://" .. a:sub(7)
+    end
+    if a:sub(1, 8) == "https://" then
+        return localAsset(a)
     end
     return nil
 end
@@ -496,7 +533,7 @@ local function accountUI(start: any, conf: any): any
     sub.Font = Enum.Font.Gotham
     sub.Position = UDim2.new(0, 18, 0, 34)
     sub.Size = UDim2.new(1, -90, 0, 16)
-    sub.Text = "РІРѕР№РґРё РёР»Рё СЃРѕР·РґР°Р№ Р°РєРєР°СѓРЅС‚"
+    sub.Text = "войди или создай аккаунт"
     sub.TextColor3 = dim
     sub.TextSize = 11
     sub.TextXAlignment = Enum.TextXAlignment.Left
@@ -507,7 +544,7 @@ local function accountUI(start: any, conf: any): any
     close.Font = Enum.Font.GothamBold
     close.Position = UDim2.new(1, -34, 0, 12)
     close.Size = UDim2.fromOffset(22, 22)
-    close.Text = "Г—"
+    close.Text = "×"
     close.TextColor3 = dim
     close.TextSize = 16
     close.Parent = card
@@ -536,8 +573,8 @@ local function accountUI(start: any, conf: any): any
     local masked = ""
     local busy = false
     local finished = false
-    local emailCode = (conf or ACCCFG) and (conf or ACCCFG).email_code == true or false
-    local canReset = (conf or ACCCFG) and (conf or ACCCFG).reset == true or false
+    local cfgv = conf or ACCCFG
+    local canReset = cfgv ~= nil and cfgv.reset == true
     local result: any = nil
     local show
 
@@ -666,11 +703,11 @@ local function accountUI(start: any, conf: any): any
             local r = areq(path, data)
             busy = false
             if not r then
-                err.Text = "РЅРµС‚ СЃРІСЏР·Рё СЃ СЃРµСЂРІРµСЂРѕРј"
+                err.Text = "нет связи с сервером"
                 return
             end
             if not r.ok then
-                err.Text = tostring(r.error or "РѕС€РёР±РєР°")
+                err.Text = tostring(r.error or "ошибка")
                 return
             end
             cb(r)
@@ -716,14 +753,14 @@ local function accountUI(start: any, conf: any): any
         err.Text = ""
 
         if mode == "login" then
-            sub.Text = "РІРѕР№РґРё РёР»Рё СЃРѕР·РґР°Р№ Р°РєРєР°СѓРЅС‚"
-            local _, gu = box(10, "Р»РѕРіРёРЅ")
-            local _, gp = box(50, "РїР°СЂРѕР»СЊ", true)
-            button(94, "Р’РѕР№С‚Рё", true, function()
+            sub.Text = "войди или создай аккаунт"
+            local _, gu = box(10, "логин")
+            local _, gp = box(50, "пароль", true)
+            button(94, "Войти", true, function()
                 local u = gu()
                 local pw = gp()
                 if #u < 3 or #pw < 1 then
-                    err.Text = "Р·Р°РїРѕР»РЅРё Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ"
+                    err.Text = "заполни логин и пароль"
                     return
                 end
                 req("/api/acc/login", { username = u, password = pw }, function(r)
@@ -737,24 +774,24 @@ local function accountUI(start: any, conf: any): any
                 end)
             end)
             if canReset then
-                link(136, "Р—Р°Р±С‹Р»Рё РїР°СЂРѕР»СЊ?", function()
+                link(136, "Забыли пароль?", function()
                     show("reset")
                 end)
             end
-            link(224, "РќРµС‚Сѓ Р°РєРєР°СѓРЅС‚Р°? Р—Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊСЃСЏ", function()
+            link(224, "Нету аккаунта? Зарегистрироваться", function()
                 show("register")
             end)
         elseif mode == "register" then
-            sub.Text = "РЅРѕРІС‹Р№ Р°РєРєР°СѓРЅС‚"
-            local _, gu = box(10, "Р»РѕРіРёРЅ (3-24, Р±СѓРєРІС‹/С†РёС„СЂС‹/_)")
-            local _, gp = box(50, "РїР°СЂРѕР»СЊ (РѕС‚ 6 СЃРёРјРІРѕР»РѕРІ)", true)
-            local _, ge = box(90, "РїРѕС‡С‚Р° (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ)")
-            button(134, "РЎРѕР·РґР°С‚СЊ Р°РєРєР°СѓРЅС‚", true, function()
+            sub.Text = "новый аккаунт"
+            local _, gu = box(10, "логин (3-24, буквы/цифры/_)")
+            local _, gp = box(50, "пароль (от 6 символов)", true)
+            local _, ge = box(90, "почта (необязательно)")
+            button(134, "Создать аккаунт", true, function()
                 local u = gu()
                 local pw = gp()
                 local e = ge()
                 if #u < 3 or #pw < 6 or (e ~= "" and #e < 5) then
-                    err.Text = "РїСЂРѕРІРµСЂСЊ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ"
+                    err.Text = "проверь логин и пароль"
                     return
                 end
                 req("/api/acc/register", { username = u, password = pw, email = e }, function(r)
@@ -767,16 +804,16 @@ local function accountUI(start: any, conf: any): any
                     show("code")
                 end)
             end)
-            link(178, "РЈР¶Рµ РµСЃС‚СЊ Р°РєРєР°СѓРЅС‚? Р’РѕР№С‚Рё", function()
+            link(178, "Уже есть аккаунт? Войти", function()
                 show("login")
             end)
         elseif mode == "code" then
-            sub.Text = "РєРѕРґ РѕС‚РїСЂР°РІР»РµРЅ РЅР° " .. masked
-            local _, gc = box(10, "РєРѕРґ РёР· РїРёСЃСЊРјР° (6 С†РёС„СЂ)")
-            button(54, "РџРѕРґС‚РІРµСЂРґРёС‚СЊ", true, function()
+            sub.Text = "код отправлен на " .. masked
+            local _, gc = box(10, "код из письма (6 цифр)")
+            button(54, "Подтвердить", true, function()
                 local code = gc():gsub("%s", "")
                 if #code < 6 then
-                    err.Text = "РІРІРµРґРё 6 С†РёС„СЂ"
+                    err.Text = "введи 6 цифр"
                     return
                 end
                 req("/api/acc/verify", { challenge = challenge, code = code }, function(r)
@@ -791,23 +828,23 @@ local function accountUI(start: any, conf: any): any
                     show("profile")
                 end)
             end)
-            link(98, "РќР°Р·Р°Рґ", function()
+            link(98, "Назад", function()
                 show("login")
             end)
         elseif mode == "reset" then
-            sub.Text = "СЃР±СЂРѕСЃ РїР°СЂРѕР»СЏ"
+            sub.Text = "сброс пароля"
             if not canReset then
-                label(6, "СЃР±СЂРѕСЃ РїР°СЂРѕР»СЏ РїРѕРєР° РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” РїРѕС‡С‚Р° РµС‰С‘ РЅРµ РїРѕРґРєР»СЋС‡РµРЅР°. РЅР°РїРёС€Рё Р°РґРјРёРЅСѓ, РѕРЅ СЃРјРµРЅРёС‚ РїР°СЂРѕР»СЊ РІСЂСѓС‡РЅСѓСЋ.", 60, badC, 11)
-                link(78, "РќР°Р·Р°Рґ", function()
+                label(6, "сброс пароля пока недоступен — почта ещё не подключена. напиши админу, он сменит пароль вручную.", 60, badC, 11)
+                link(78, "Назад", function()
                     show("login")
                 end)
                 return
             end
-            local _, ge = box(10, "РїРѕС‡С‚Р° РёР»Рё Р»РѕРіРёРЅ")
-            button(54, "РћС‚РїСЂР°РІРёС‚СЊ РєРѕРґ", true, function()
+            local _, ge = box(10, "почта или логин")
+            button(54, "Отправить код", true, function()
                 local e = ge()
                 if #e < 3 then
-                    err.Text = "РІРІРµРґРё РїРѕС‡С‚Сѓ"
+                    err.Text = "введи почту"
                     return
                 end
                 req("/api/acc/reset", { email = e }, function(r)
@@ -816,18 +853,18 @@ local function accountUI(start: any, conf: any): any
                     show("reset2")
                 end)
             end)
-            link(98, "РќР°Р·Р°Рґ", function()
+            link(98, "Назад", function()
                 show("login")
             end)
         elseif mode == "reset2" then
-            sub.Text = "РєРѕРґ РѕС‚РїСЂР°РІР»РµРЅ РЅР° " .. masked
-            local _, gc = box(10, "РєРѕРґ РёР· РїРёСЃСЊРјР°")
-            local _, gp = box(50, "РЅРѕРІС‹Р№ РїР°СЂРѕР»СЊ", true)
-            button(94, "РЎРјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ", true, function()
+            sub.Text = "код отправлен на " .. masked
+            local _, gc = box(10, "код из письма")
+            local _, gp = box(50, "новый пароль", true)
+            button(94, "Сменить пароль", true, function()
                 local code = gc():gsub("%s", "")
                 local pw = gp()
                 if #code < 6 or #pw < 6 then
-                    err.Text = "РєРѕРґ Рё РїР°СЂРѕР»СЊ РѕС‚ 6 СЃРёРјРІРѕР»РѕРІ"
+                    err.Text = "код и пароль от 6 символов"
                     return
                 end
                 req("/api/acc/reset/confirm", { challenge = challenge, code = code, password = pw }, function(r)
@@ -842,11 +879,11 @@ local function accountUI(start: any, conf: any): any
                     show("profile")
                 end)
             end)
-            link(138, "РќР°Р·Р°Рґ", function()
+            link(138, "Назад", function()
                 show("login")
             end)
         elseif mode == "profile" then
-            sub.Text = "РїСЂРѕС„РёР»СЊ"
+            sub.Text = "профиль"
             if not acc then
                 show("login")
                 return
@@ -879,14 +916,14 @@ local function accountUI(start: any, conf: any): any
             rl.TextXAlignment = Enum.TextXAlignment.Left
             rl.Parent = holder
 
-            button(86, "РџСЂРѕРґРѕР»Р¶РёС‚СЊ", true, function()
+            button(86, "Продолжить", true, function()
                 finished = true
                 result = acc
             end)
-            button(126, "РЎРјРµРЅРёС‚СЊ Р°РІР°С‚Р°СЂ", false, function()
+            button(126, "Сменить аватар", false, function()
                 show("avatar")
             end)
-            link(170, "Р’С‹Р№С‚Рё РёР· Р°РєРєР°СѓРЅС‚Р°", function()
+            link(170, "Выйти из аккаунта", function()
                 local t = acc.t
                 accWipe()
                 acc = nil
@@ -897,13 +934,13 @@ local function accountUI(start: any, conf: any): any
                 result = false
             end)
         elseif mode == "avatar" then
-            sub.Text = "Р°РІР°С‚Р°СЂ"
-            label(6, "РІСЃС‚Р°РІСЊ asset id, thumb:<userId>, #rrggbb РёР»Рё https:// СЃСЃС‹Р»РєСѓ", 28, dim, 10)
-            local _, ga = box(40, "РЅР°РїСЂРёРјРµСЂ 123456789 РёР»Рё #4ade80")
+            sub.Text = "аватар"
+            label(6, "вставь asset id, thumb:<userId>, #rrggbb или https:// ссылку", 28, dim, 10)
+            local _, ga = box(40, "например 123456789 или #4ade80")
             if acc and typeof(acc.a) == "string" then
                 ga()
             end
-            button(84, "РЎРѕС…СЂР°РЅРёС‚СЊ", true, function()
+            button(84, "Сохранить", true, function()
                 local v = ga():gsub("%s", "")
                 req("/api/acc/avatar", { t = acc.t, avatar = v }, function(r)
                     acc.a = r.avatar
@@ -911,16 +948,14 @@ local function accountUI(start: any, conf: any): any
                     show("profile")
                 end)
             end)
-            link(128, "РќР°Р·Р°Рґ", function()
+            link(128, "Назад", function()
                 show("profile")
             end)
         end
     end
 
     close.MouseButton1Click:Connect(function()
-        if finished then return end
-        finished = true
-        result = nil
+        err.Text = "без аккаунта скрипт не запустится"
     end)
 
     show(mode)
@@ -940,7 +975,7 @@ local function setAccUI(a: any)
     if not UI then return end
     if a then
         pcall(function() UI.raw:SetTitle(tostring(a.u or "")) end)
-        pcall(function() UI.raw:SetSubtitle(V .. " В· " .. tostring(a.r or "member")) end)
+        pcall(function() UI.raw:SetSubtitle(V .. " · " .. tostring(a.r or "member")) end)
         local url = avUrl(a.a)
         if url then
             pcall(function() UI.raw:SetAvatar(url) end)
@@ -1447,14 +1482,16 @@ local function go()
 
     if UI then UI.hide() end
     local acc: any = accountGate()
+    if not acc then
+        if UI then UI.show() end
+        st("Account required.")
+        bad("Account required.", "войди или создай аккаунт, чтобы запустить скрипт")
+        return
+    end
     if UI then UI.show() end
     C.acc = acc
     setAccUI(acc)
-    if acc then
-        msg("account: " .. tostring(acc.u) .. " (" .. tostring(acc.r) .. ") В· F3 РїСЂРѕС„РёР»СЊ")
-    else
-        msg("account: Р±РµР· Р°РєРєР°СѓРЅС‚Р° В· F3 РІС…РѕРґ")
-    end
+    msg("account: " .. tostring(acc.u) .. " (" .. tostring(acc.r) .. ") · F3 профиль")
 
     msg("executor: " .. e0)
 
