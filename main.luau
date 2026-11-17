@@ -1,878 +1,485 @@
--- iwakewar-scripts | main loader
--- Splash + progress UI, no external UI libraries.
+-- iwakewar-scripts | loader
 -- loadstring(game:HttpGet("https://iwakewar.fun/scripts/main.luau?k=5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"))()
 
-local Players = game:GetService("Players")
+local P = game:GetService("Players")
+local U = "https://iwakewar.fun"
+local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
+local B = U .. "/scripts/"
 
-local SITE = "https://iwakewar.fun"
-local KEY = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
-local DATA_KEY = "iwakewar-scripts-v1"
-local BASE = SITE .. "/scripts/"
-
-local function escapeUrl(path: string): string
-    return (path:gsub(" ", "%%20"))
+local function su(p: string): string
+    return B .. (p:gsub(" ", "%%20"))
 end
 
-local function scriptUrl(path: string): string
-    return BASE .. escapeUrl(path) .. "?k=" .. KEY
-end
-
-local GAME_INFO = {
+local G = {
     ["6520999642"] = {
         name = "Basically FNF: Remix",
-        url = scriptUrl("BFNFR Auto-Play.luau"),
+        file = "BFNFR Auto-Play.luau",
+        url = su("BFNFR Auto-Play.luau"),
     },
     ["6447798030"] = {
         name = "Funky Friday",
-        url = scriptUrl("FunkyFriday Auto-Play.luau"),
+        file = "FunkyFriday Auto-Play.luau",
+        url = su("FunkyFriday Auto-Play.luau"),
     },
     ["71106427459865"] = {
         name = "Игра в Слова",
-        url = scriptUrl("WordGame Auto-Play.luau"),
+        file = "WordGame Auto-Play.luau",
+        url = su("WordGame Auto-Play.luau"),
     },
     ["537413528"] = {
         name = "Build A Boat For Treasure",
-        url = scriptUrl("BABFT.luau"),
+        file = "BABFT.luau",
+        url = su("BABFT.luau"),
     },
-    -- UnAim is written against Scoped FPS internals (ReplicatedStorage.Utils.CameraController
-    -- for the camera / GetAimRay, ReplicatedStorage.GameMode.MatchQuery for the team model),
-    -- so it is mapped to this game only, per place id. Any other game would need its own
-    -- integration layer before being added here.
     ["93466613073564"] = {
         name = "Scoped FPS",
-        url = scriptUrl("UnAim.luau"),
+        file = "UnAim.luau",
+        url = su("UnAim.luau"),
     },
     ["114689356953798"] = {
         name = "Scoped FPS",
-        url = scriptUrl("UnAim.luau"),
+        file = "UnAim.luau",
+        url = su("UnAim.luau"),
     },
 }
 
--- ── hardban preflight ─────────────────────────────────────────────────────
--- runs before anything is downloaded, drawn or executed. if the device, ip or
--- account is hardbanned the loader just refuses to do anything at all.
-do
-    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+local T: string? = nil -- run ticket from the server
 
-    local okId, clientId = pcall(function()
+local function en(v: any): string
+    return (tostring(v):gsub("[^%w%-%._~]", function(c: string): string
+        return string.format("%%%02X", string.byte(c))
+    end))
+end
+
+local function gv(): any
+    local ok, t = pcall(function() return getgenv() end)
+    if ok and typeof(t) == "table" then return t end
+    return _G
+end
+
+local function rq(u: string): string?
+    local g = gv()
+    local f = (g.syn and g.syn.request) or (g.http and g.http.request) or g.http_request
+        or (g.fluxus and g.fluxus.request) or g.request
+    if typeof(f) == "function" then
+        local ok, r = pcall(f, { Url = u, Method = "GET" })
+        if ok then
+            if typeof(r) == "table" then return tostring(r.Body or "") end
+            if typeof(r) == "string" then return r end
+        end
+    end
+    local ok, r = pcall(function()
+        return game:HttpGet(u)
+    end)
+    if ok and typeof(r) == "string" then return r end
+    local ok2, r2 = pcall(function()
+        return game:GetService("HttpService"):GetAsync(u)
+    end)
+    if ok2 and typeof(r2) == "string" then return r2 end
+    return nil
+end
+
+local function hw(): string
+    local ok, v = pcall(function() return gethwid() end)
+    if ok and typeof(v) == "string" and #v > 0 then return v end
+    local ok2, c = pcall(function()
         return game:GetService("RbxAnalyticsService"):GetClientId()
     end)
-    local hwid = (okId and typeof(clientId) == "string") and clientId or ""
-
-    local player = Players.LocalPlayer
-    local waited = 0
-    while not player and waited < 10 do
-        task.wait(0.5)
-        waited += 1
-        player = Players.LocalPlayer
-    end
-
-    if #hwid == 0 and player then
-        hwid = "uid-" .. tostring(player.UserId)
-    end
-
-    local function urlencode(value: string): string
-        local out = {}
-        for i = 1, #value do
-            local c = value:sub(i, i)
-            local b = string.byte(c)
-            local safe = (b >= 48 and b <= 57)
-                or (b >= 65 and b <= 90)
-                or (b >= 97 and b <= 122)
-                or b == 45
-                or b == 46
-                or b == 95
-                or b == 126
-            if safe then
-                out[#out + 1] = c
-            else
-                out[#out + 1] = string.format("%%%02X", b)
-            end
-        end
-        return table.concat(out)
-    end
-
-    if #hwid > 0 then
-        local checkUrl = SITE
-            .. "/api/check?k=" .. KEY
-            .. "&hwid=" .. urlencode(hwid)
-            .. "&user_id=" .. urlencode(player and tostring(player.UserId) or "")
-            .. "&username=" .. urlencode(player and player.Name or "")
-
-        local body = nil
-        if typeof(httpRequest) == "function" then
-            local ok, res = pcall(httpRequest, {
-                Url = checkUrl,
-                Method = "GET",
-                Headers = { ["x-iw-key"] = KEY },
-            })
-            if ok then
-                body = typeof(res) == "table" and res.Body or res
-            end
-        else
-            local ok, res = pcall(function()
-                return game:HttpGet(checkUrl)
-            end)
-            if ok then
-                body = res
-            end
-        end
-
-        if typeof(body) == "string" and body:find('"banned"%s*:%s*true') then
-            warn("[iwakewar-scripts] access denied: this device / account is hardbanned")
-            return
-        end
-    end
+    if ok2 and typeof(c) == "string" and #c > 0 then return c end
+    local p = P.LocalPlayer
+    return "uid-" .. tostring(p and p.UserId or 0)
 end
 
--- ── script decoding ───────────────────────────────────────────────────────
--- game scripts are uploaded xor-encoded as hex so a random person cannot just
--- open the url and read the source.
-local function decodeSource(data: string): string?
-    if #data < 2 or #data % 2 ~= 0 then
-        return nil
-    end
-    local out = table.create(#data // 2)
-    local klen = #DATA_KEY
-    for i = 1, #data, 2 do
-        local byte = tonumber(data:sub(i, i + 1), 16)
-        if not byte then
-            return nil
-        end
-        local idx = #out + 1
-        local k = string.byte(DATA_KEY, (idx - 1) % klen + 1)
-        out[idx] = string.char(bit32.bxor(byte, k))
-    end
-    return table.concat(out)
+local function ex(): string
+    local ok, a = pcall(function() return identifyexecutor() end)
+    if ok and typeof(a) == "string" and #a > 0 then return a end
+    return "unknown"
 end
 
--- ── telemetry ─────────────────────────────────────────────────────────────
--- fire-and-forget pings to the dashboard api: who runs the script, where, for how long.
--- everything is pcall'd and guarded, a dead endpoint never breaks the loader.
-do
-    local API = "https://iwakewar.fun/api/ingest"
-    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
-
-    local function send(payload: { [string]: any })
-        if typeof(httpRequest) ~= "function" then
-            return
+-- integrity digest: must match checksum() in the worker
+local function ck(s: string): number
+    local n = #s
+    local t = 0
+    local i = 1
+    while i <= n do
+        local j = math.min(i + 511, n)
+        local b = { string.byte(s, i, j) }
+        for k = 1, #b do
+            t += b[k] * (i + k - 1)
         end
-        local ok, body = pcall(function()
-            return game:GetService("HttpService"):JSONEncode(payload)
-        end)
-        if not ok or typeof(body) ~= "string" then
-            return
-        end
-        pcall(httpRequest, {
-            Url = API,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["x-iw-key"] = KEY,
-            },
-            Body = body,
-        })
+        i = j + 1
     end
-
-    local function getHwid(player: Player): string
-        local ok, id = pcall(function()
-            return game:GetService("RbxAnalyticsService"):GetClientId()
-        end)
-        if ok and typeof(id) == "string" and #id > 0 then
-            return id
-        end
-        return "uid-" .. tostring(player.UserId)
-    end
-
-    local function executorName(): string
-        local ok, name = pcall(function()
-            return identifyexecutor()
-        end)
-        if ok and typeof(name) == "string" and #name > 0 then
-            return name
-        end
-        return "unknown"
-    end
-
-    task.spawn(function()
-        local player = Players.LocalPlayer
-        local waited = 0
-        while not player and waited < 30 do
-            task.wait(1)
-            waited += 1
-            player = Players.LocalPlayer
-        end
-        if not player then
-            return
-        end
-
-        local hwid = getHwid(player)
-        local executor = executorName()
-        local placeId = tostring(game.PlaceId)
-        local info = GAME_INFO[placeId]
-        local supported = info ~= nil
-        local placeName = info and info.name
-        if not placeName then
-            local ok, product = pcall(function()
-                return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId, Enum.InfoType.Asset)
-            end)
-            if ok and typeof(product) == "table" and typeof(product.Name) == "string" then
-                placeName = product.Name
-            else
-                placeName = "place " .. placeId
-            end
-        end
-
-        local lastPing = os.clock()
-        local first = true
-
-        while true do
-            if not player.Parent then
-                return
-            end
-            local now = os.clock()
-            local elapsed = math.floor(now - lastPing)
-            lastPing = now
-
-            send({
-                hwid = hwid,
-                username = player.Name,
-                user_id = tostring(player.UserId),
-                executor = executor,
-                place_id = placeId,
-                place_name = placeName,
-                supported = supported,
-                playtime_delta = math.min(elapsed, 120),
-                executed = first and 1 or 0,
-            })
-
-            first = false
-            task.wait(60)
-        end
-    end)
+    return (n * 2654435761 + t) % 4294967296
 end
 
-local function fetch(url: string): (string?, string?)
-    local src: string? = nil
-    if typeof(game.HttpGet) == "function" then
-        local ok, res = pcall(function()
-            return game:HttpGet(url)
-        end)
-        if ok and typeof(res) == "string" and #res > 0 then
-            src = res
-        else
-            if not ok then
-                return nil, "HttpGet failed: " .. tostring(res):sub(1, 200)
-            end
-        end
-    end
-    if not src then
-        local ok, res = pcall(function()
-            return game:GetService("HttpService"):GetAsync(url)
-        end)
-        if ok and typeof(res) == "string" and #res > 0 then
-            src = res
-        else
-            return nil, "GetAsync failed: " .. tostring(res):sub(1, 200)
-        end
-    end
-    return src, nil
-end
+local function fallback()
+    local p = P.LocalPlayer
+    if not p then return nil end
+    local pg = p:FindFirstChildOfClass("PlayerGui") or p:WaitForChild("PlayerGui", 10)
+    if not pg then return nil end
 
-local function runSource(src: string, name: string): (boolean, string?)
-    if typeof(loadstring) ~= "function" then
-        return false, "loadstring() missing on this executor"
-    end
-    local fn, err = loadstring(src)
-    if not fn then
-        return false, "compile error in " .. name .. ": " .. tostring(err)
-    end
-    local ok, rerr = pcall(fn)
-    if not ok then
-        return false, "runtime error in " .. name .. ": " .. tostring(rerr)
-    end
-    return true, nil
-end
-
-local function detectGame()
-    local placeId = tostring(game.PlaceId or "")
-    local info = GAME_INFO[placeId]
-    if info then
-        return info, placeId
-    end
-    return nil, placeId
-end
-
-local function getExecutorName(): string
-    local name = "unknown"
-    pcall(function()
-        if typeof(identifyexecutor) == "function" then
-            local execName = identifyexecutor()
-            name = tostring(execName)
-        end
-    end)
-    return name
-end
-
-local function copyText(text: string): boolean
-    local g: any = nil
-    if typeof(getgenv) == "function" then
-        local ok, gg = pcall(getgenv)
-        if ok and typeof(gg) == "table" then g = gg end
-    end
-    if not g then g = _G end
-    for _, name in ipairs({ "setclipboard", "toclipboard", "writeclipboard" }) do
-        local v = g[name]
-        if v == nil then v = rawget(_G, name) end
-        if typeof(v) == "function" then
-            if pcall(v, text) then return true end
-        end
-    end
-    if typeof(setclipboard) == "function" and pcall(setclipboard, text) then return true end
-    if typeof(toclipboard) == "function" and pcall(toclipboard, text) then return true end
-    return false
-end
-
--- ============ 2014-style splash + terminal console (fallback) ============
--- Используется только если PrimordialUI не скачался: тогда грузим старый
--- терминальный сплэш, чтобы лоадер не умер молча.
-local function buildLegacySplash()
-    local player = Players.LocalPlayer
-    if not player then
-        return nil
-    end
-    local playerGui = player:WaitForChild("PlayerGui")
-
+    local C = Color3.fromRGB
     local F = Enum.Font.Code
-    local C_PANEL = Color3.fromRGB(16, 16, 16)
-    local C_LINE = Color3.fromRGB(70, 70, 70)
-    local C_TXT = Color3.fromRGB(220, 220, 220)
-    local C_DIMTXT = Color3.fromRGB(140, 140, 140)
-    local C_GREEN = Color3.fromRGB(0, 255, 0)
-    local C_DGREEN = Color3.fromRGB(0, 180, 0)
-    local C_RED = Color3.fromRGB(255, 60, 60)
-    local C_BARBG = Color3.fromRGB(28, 28, 28)
-    local C_CONSOLE = Color3.fromRGB(5, 5, 5)
+    local TXT = C(220, 220, 220)
+    local DIM = C(140, 140, 140)
+    local GRN = C(0, 255, 0)
+    local RED = C(255, 60, 60)
+    local LINE = C(70, 70, 70)
 
-    local lastError: string? = nil
-    local failed = false
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "iwakewar-scripts"
+    sg.DisplayOrder = 999
+    sg.IgnoreGuiInset = true
+    sg.ResetOnSpawn = false
+    sg.Parent = pg
 
-    local sgui = Instance.new("ScreenGui")
-    sgui.Name = "iwakewar-scripts"
-    sgui.DisplayOrder = 100
-    sgui.IgnoreGuiInset = true
-    sgui.ResetOnSpawn = false
-    sgui.Parent = playerGui
+    local w = Instance.new("Frame")
+    w.AnchorPoint = Vector2.new(0.5, 0.5)
+    w.Position = UDim2.fromScale(0.5, 0.5)
+    w.Size = UDim2.fromOffset(470, 300)
+    w.BackgroundColor3 = C(16, 16, 16)
+    w.BorderSizePixel = 0
+    w.Parent = sg
 
-    -- fullscreen dim (оставлен)
-    local dim = Instance.new("Frame")
-    dim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    dim.BorderSizePixel = 0
-    dim.Size = UDim2.fromScale(1, 1)
-    dim.Parent = sgui
+    local st = Instance.new("UIStroke")
+    st.Color = LINE
+    st.Thickness = 1
+    st.Parent = w
 
-    local win = Instance.new("Frame")
-    win.AnchorPoint = Vector2.new(0.5, 0.5)
-    win.BackgroundColor3 = C_PANEL
-    win.BorderSizePixel = 0
-    win.Position = UDim2.fromScale(0.5, 0.5)
-    win.Size = UDim2.fromOffset(480, 400)
-    win.Parent = sgui
+    local ac = Instance.new("Frame")
+    ac.Size = UDim2.new(1, 0, 0, 2)
+    ac.BackgroundColor3 = GRN
+    ac.BorderSizePixel = 0
+    ac.Parent = w
 
-    local winBorder = Instance.new("UIStroke")
-    winBorder.Color = C_LINE
-    winBorder.Thickness = 1
-    winBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    winBorder.Parent = win
+    local ti = Instance.new("TextLabel")
+    ti.BackgroundTransparency = 1
+    ti.Font = F
+    ti.Position = UDim2.new(0, 12, 0, 8)
+    ti.Size = UDim2.new(1, -24, 0, 22)
+    ti.Text = "> iwakewar-scripts_"
+    ti.TextColor3 = TXT
+    ti.TextSize = 17
+    ti.TextXAlignment = Enum.TextXAlignment.Left
+    ti.Parent = w
 
-    -- внутренняя рамка: двойной контур как в гуихе
-    local inner = Instance.new("Frame")
-    inner.BackgroundTransparency = 1
-    inner.AnchorPoint = Vector2.new(0.5, 0.5)
-    inner.Position = UDim2.fromScale(0.5, 0.5)
-    inner.Size = UDim2.new(1, -8, 1, -8)
-    inner.Parent = win
-    local innerStroke = Instance.new("UIStroke")
-    innerStroke.Color = Color3.fromRGB(38, 38, 38)
-    innerStroke.Thickness = 1
-    innerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    innerStroke.Parent = inner
+    local sb = Instance.new("TextLabel")
+    sb.BackgroundTransparency = 1
+    sb.Font = F
+    sb.Position = UDim2.new(0, 12, 0, 28)
+    sb.Size = UDim2.new(1, -24, 0, 14)
+    sb.Text = "[loader v3]"
+    sb.TextColor3 = C(0, 180, 0)
+    sb.TextSize = 12
+    sb.TextXAlignment = Enum.TextXAlignment.Left
+    sb.Parent = w
 
-    -- верхняя кислотная полоса 2px, без скруглений
-    local accent = Instance.new("Frame")
-    accent.BackgroundColor3 = C_GREEN
-    accent.BorderSizePixel = 0
-    accent.Size = UDim2.new(1, 0, 0, 2)
-    accent.Position = UDim2.fromScale(0, 0)
-    accent.Parent = win
+    local ln = Instance.new("Frame")
+    ln.BackgroundColor3 = LINE
+    ln.BorderSizePixel = 0
+    ln.Position = UDim2.new(0, 12, 0, 48)
+    ln.Size = UDim2.new(1, -24, 0, 1)
+    ln.Parent = w
 
-    local title = Instance.new("TextLabel")
-    title.BackgroundTransparency = 1
-    title.Font = F
-    title.Position = UDim2.new(0, 12, 0, 10)
-    title.Size = UDim2.new(1, -150, 0, 24)
-    title.Text = "> iwakewar-scripts_"
-    title.TextColor3 = C_TXT
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = win
+    local co = Instance.new("Frame")
+    co.BackgroundColor3 = C(5, 5, 5)
+    co.BorderSizePixel = 0
+    co.Position = UDim2.new(0, 12, 0, 54)
+    co.Size = UDim2.new(1, -24, 0, 170)
+    co.Parent = w
 
-    local tty = Instance.new("TextLabel")
-    tty.BackgroundTransparency = 1
-    tty.Font = F
-    tty.Position = UDim2.new(1, -140, 0, 12)
-    tty.Size = UDim2.new(0, 128, 0, 16)
-    tty.Text = "root@alpine:~#"
-    tty.TextColor3 = Color3.fromRGB(90, 90, 90)
-    tty.TextSize = 11
-    tty.TextXAlignment = Enum.TextXAlignment.Right
-    tty.Parent = win
+    local cs = Instance.new("UIStroke")
+    cs.Color = C(50, 50, 50)
+    cs.Thickness = 1
+    cs.Parent = co
 
-    local sub = Instance.new("TextLabel")
-    sub.BackgroundTransparency = 1
-    sub.Font = F
-    sub.Position = UDim2.new(0, 12, 0, 34)
-    sub.Size = UDim2.new(1, -24, 0, 16)
-    sub.Text = "[loader v2] :: terminal"
-    sub.TextColor3 = C_DGREEN
-    sub.TextSize = 13
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.Parent = win
+    local cp = Instance.new("UIPadding")
+    cp.PaddingLeft = UDim.new(0, 8)
+    cp.PaddingRight = UDim.new(0, 8)
+    cp.PaddingTop = UDim.new(0, 6)
+    cp.Parent = co
 
-    local sep = Instance.new("Frame")
-    sep.BackgroundColor3 = C_LINE
-    sep.BorderSizePixel = 0
-    sep.Position = UDim2.new(0, 12, 0, 56)
-    sep.Size = UDim2.new(1, -24, 0, 1)
-    sep.Parent = win
+    local cl = Instance.new("UIListLayout")
+    cl.FillDirection = Enum.FillDirection.Vertical
+    cl.Padding = UDim.new(0, 2)
+    cl.SortOrder = Enum.SortOrder.LayoutOrder
+    cl.Parent = co
 
-    -- окошко командной строки
-    local console = Instance.new("Frame")
-    console.BackgroundColor3 = C_CONSOLE
-    console.BorderSizePixel = 0
-    console.Position = UDim2.new(0, 12, 0, 64)
-    console.Size = UDim2.new(1, -24, 0, 180)
-    console.Parent = win
-    local conStroke = Instance.new("UIStroke")
-    conStroke.Color = Color3.fromRGB(50, 50, 50)
-    conStroke.Thickness = 1
-    conStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    conStroke.Parent = console
-    local conPad = Instance.new("UIPadding")
-    conPad.PaddingLeft = UDim.new(0, 8)
-    conPad.PaddingRight = UDim.new(0, 8)
-    conPad.PaddingTop = UDim.new(0, 6)
-    conPad.PaddingBottom = UDim.new(0, 6)
-    conPad.Parent = console
-    local conLayout = Instance.new("UIListLayout")
-    conLayout.FillDirection = Enum.FillDirection.Vertical
-    conLayout.Padding = UDim.new(0, 2)
-    conLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    conLayout.Parent = console
+    local er = Instance.new("TextLabel")
+    er.BackgroundColor3 = C(24, 10, 10)
+    er.BorderSizePixel = 0
+    er.Font = F
+    er.Position = UDim2.new(0, 12, 0, 232)
+    er.Size = UDim2.new(1, -24, 0, 30)
+    er.Text = ""
+    er.TextColor3 = RED
+    er.TextSize = 11
+    er.TextWrapped = true
+    er.TextXAlignment = Enum.TextXAlignment.Left
+    er.TextYAlignment = Enum.TextYAlignment.Top
+    er.Visible = false
+    er.Parent = w
 
-    -- шагающий бар без процентов (появляется снизу на loading-степе)
-    local barBG = Instance.new("Frame")
-    barBG.BackgroundColor3 = C_BARBG
-    barBG.BorderSizePixel = 0
-    barBG.Position = UDim2.new(0, 12, 0, 252)
-    barBG.Size = UDim2.new(1, -24, 0, 14)
-    barBG.Visible = false
-    barBG.Parent = win
-    local barStroke = Instance.new("UIStroke")
-    barStroke.Color = Color3.fromRGB(90, 90, 90)
-    barStroke.Thickness = 1
-    barStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    barStroke.Parent = barBG
-
-    -- бегающий чанк вместо fill с процентами
-    local chunk = Instance.new("Frame")
-    chunk.BackgroundColor3 = C_GREEN
-    chunk.BorderSizePixel = 0
-    chunk.Position = UDim2.fromScale(0, 0)
-    chunk.Size = UDim2.fromScale(0.25, 1)
-    chunk.Parent = barBG
-
-    -- поле ошибки (показывается только при fail)
-    local errBox = Instance.new("TextLabel")
-    errBox.BackgroundColor3 = Color3.fromRGB(24, 10, 10)
-    errBox.BorderSizePixel = 0
-    errBox.Font = F
-    errBox.Position = UDim2.new(0, 12, 0, 274)
-    errBox.Size = UDim2.new(1, -24, 0, 62)
-    errBox.Text = ""
-    errBox.TextColor3 = C_RED
-    errBox.TextSize = 12
-    errBox.TextWrapped = true
-    errBox.TextXAlignment = Enum.TextXAlignment.Left
-    errBox.TextYAlignment = Enum.TextYAlignment.Top
-    errBox.Visible = false
-    errBox.Parent = win
-    local errStroke = Instance.new("UIStroke")
-    errStroke.Color = Color3.fromRGB(120, 30, 30)
-    errStroke.Thickness = 1
-    errStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    errStroke.Parent = errBox
-    local errPad = Instance.new("UIPadding")
-    errPad.PaddingLeft = UDim.new(0, 6)
-    errPad.PaddingRight = UDim.new(0, 6)
-    errPad.PaddingTop = UDim.new(0, 4)
-    errPad.PaddingBottom = UDim.new(0, 4)
-    errPad.Parent = errBox
-
-    local closeBtnRef: { btn: TextButton? } = { btn = nil }
-    local function mkBtn(text: string, xScale: number, wScale: number): TextButton
-        local b = Instance.new("TextButton")
-        b.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-        b.BorderSizePixel = 0
-        b.Font = F
-        b.Position = UDim2.new(xScale, 0, 1, -40)
-        b.Size = UDim2.new(wScale, -5, 0, 30)
-        b.Text = text
-        b.TextColor3 = C_TXT
-        b.TextSize = 14
-        b.AutoButtonColor = false
-        b.Parent = win
-        local st = Instance.new("UIStroke")
-        st.Color = C_LINE
-        st.Thickness = 1
-        st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        st.Parent = b
-        b.MouseEnter:Connect(function()
-            if closeBtnRef.btn ~= nil and b == closeBtnRef.btn then
-                b.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-            else
-                b.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
-            end
-        end)
-        b.MouseLeave:Connect(function()
-            if closeBtnRef.btn ~= nil and b == closeBtnRef.btn then
-                b.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
-            else
-                b.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-            end
-        end)
-        return b
-    end
-
-    local closeBtn = mkBtn("Close", 0.022, 0.466)
-    closeBtnRef.btn = closeBtn
-    closeBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Visible = false
-    closeBtn.MouseButton1Click:Connect(function()
-        sgui:Destroy()
+    local bs = Instance.new("TextButton")
+    bs.AnchorPoint = Vector2.new(0, 1)
+    bs.BackgroundColor3 = C(150, 30, 30)
+    bs.BorderSizePixel = 0
+    bs.Font = F
+    bs.Position = UDim2.new(0, 12, 1, -12)
+    bs.Size = UDim2.new(1, -24, 0, 26)
+    bs.Text = "Close"
+    bs.TextColor3 = C(255, 255, 255)
+    bs.TextSize = 13
+    bs.Visible = false
+    bs.Parent = w
+    bs.MouseButton1Click:Connect(function()
+        sg:Destroy()
     end)
 
-    local copyBtn = mkBtn("[ copy the error ]", 0.512, 0.466)
-    copyBtn.Visible = false
-    copyBtn.MouseButton1Click:Connect(function()
-        local txt = lastError or "no error captured"
-        local full = "[iwakewar-scripts] " .. txt
-            .. "\nplace=" .. tostring(game.PlaceId)
-            .. "\nexecutor=" .. getExecutorName()
-        if copyText(full) then
-            copyBtn.Text = "[ copied! ]"
-        else
-            copyBtn.Text = "[ no clipboard api ]"
-        end
-        task.delay(1.5, function()
-            if copyBtn.Parent then
-                copyBtn.Text = "[ copy the error ]"
-            end
-        end)
-    end)
-
+    local n = 0
     local ui: any = {}
-    local lineN = 0
-    local marqueeOn = false
+    local dead = false
 
-    -- строка в терминале
-    ui.log = function(text: string, color: Color3?)
-        lineN += 1
+    ui.log = function(t: string, c: Color3?)
+        n += 1
         local l = Instance.new("TextLabel")
         l.BackgroundTransparency = 1
         l.Font = F
-        l.Size = UDim2.new(1, 0, 0, 16)
-        l.Text = text
-        l.TextColor3 = color or C_DIMTXT
-        l.TextSize = 13
+        l.Size = UDim2.new(1, 0, 0, 15)
+        l.Text = t
+        l.TextColor3 = c or DIM
+        l.TextSize = 12
         l.TextXAlignment = Enum.TextXAlignment.Left
         l.TextTruncate = Enum.TextTruncate.AtEnd
-        l.LayoutOrder = lineN
-        l.Parent = console
-        return l
-    end
-
-    ui.startMarquee = function()
-        barBG.Visible = true
-        if marqueeOn then return end
-        marqueeOn = true
-        task.spawn(function()
-            local pos = 0
-            local dir = 1
-            while marqueeOn and barBG.Parent do
-                pos += dir * 0.05
-                if pos >= 0.75 then dir = -1 end
-                if pos <= 0 then dir = 1 end
-                chunk.Position = UDim2.fromScale(pos, 0)
-                task.wait(0.06)
+        l.LayoutOrder = n
+        l.Parent = co
+        local kids = co:GetChildren()
+        if #kids > 12 then
+            for _, v in ipairs(kids) do
+                if v:IsA("TextLabel") and v.LayoutOrder <= n - 11 then
+                    v:Destroy()
+                end
             end
-        end)
-    end
-
-    ui.stopMarquee = function(ok: boolean)
-        marqueeOn = false
-        barBG.Visible = true
-        if ok then
-            -- успех: залить весь бар зелёным
-            chunk.Position = UDim2.fromScale(0, 0)
-            chunk.Size = UDim2.fromScale(1, 1)
-            chunk.BackgroundColor3 = C_GREEN
-        else
-            chunk.Position = UDim2.fromScale(0, 0)
-            chunk.Size = UDim2.fromScale(1, 1)
-            chunk.BackgroundColor3 = C_RED
         end
     end
 
-    -- совместимость со старым кодом (больше не проценты, просто лог)
-    ui.progress = function(_frac: number, text: string, _color: Color3?)
-        ui.log("> " .. text, C_DIMTXT)
+    ui.status = function(t: string)
+        ui.log("> " .. t)
     end
 
-    ui.setGame = function(name: string, supported: boolean)
-        ui.log("game: " .. name, C_TXT)
-        if supported then
-            ui.log("status: SUPPORTED", C_GREEN)
-        else
-            ui.log("status: NOT SUPPORTED", C_RED)
-        end
-    end
-
-    ui.fail = function(msg: string, detail: string?)
-        failed = true
-        local full = msg
-        if detail and #detail > 0 then
-            full = msg .. " | " .. detail
-        end
-        lastError = full
+    ui.fail = function(m: string, d: string?)
+        dead = true
+        local full = m
+        if d and #d > 0 then full = m .. " | " .. d end
         warn("[iwakewar-scripts] " .. full)
-        ui.stopMarquee(false)
-        ui.log("> " .. msg, C_RED)
-        errBox.Text = full:sub(1, 400)
-        errBox.Visible = true
-        copyBtn.Visible = true
+        ui.log("> " .. m, RED)
+        er.Text = full:sub(1, 120)
+        er.Visible = true
+        bs.Visible = true
     end
 
-    ui.ok = function(msg: string)
-        ui.stopMarquee(true)
-        ui.log("> " .. msg, C_GREEN)
+    ui.ok = function(m: string)
+        ui.log("> " .. m, GRN)
     end
 
-    ui.showClose = function()
-        closeBtn.Visible = true
-    end
-
-    ui.setStatus = function(text: string)
-        ui.log("> " .. text, C_DIMTXT)
-    end
-
-    -- Ручное закрытие (кнопка Close) работает всегда.
-    -- Автозакрытие по успеху проверяет флаг и не срабатывает после fail.
     ui.close = function()
-        if sgui.Parent then
-            sgui:Destroy()
-        end
+        if sg.Parent then sg:Destroy() end
     end
 
     ui.didFail = function(): boolean
-        return failed
-    end
-
-    ui.getError = function(): string?
-        return lastError
+        return dead
     end
 
     return ui
 end
 
-local function runWithoutSplash()
-    local info, idShown = detectGame()
-    if not info then
-        warn("[iwakewar-scripts] This game is not supported (place " .. tostring(idShown) .. ")")
-        return
-    end
-    local src, ferr = fetch(info.url)
-    if not src then
-        warn("[iwakewar-scripts] could not fetch " .. info.url .. " | " .. tostring(ferr))
-        return
-    end
-    local decoded = decodeSource(src)
-    if not decoded then
-        warn("[iwakewar-scripts] could not decode " .. info.url)
-        return
-    end
-    local ok, rerr = runSource(decoded, info.name)
-    if not ok then
-        warn("[iwakewar-scripts] " .. tostring(rerr))
-    end
-end
+local LIB = su("gui-lib/PrimordialUI.luau")
 
-local function loadWithSplash(ui)
-    ui.setStatus("Checking executor...")
-    ui.progress(0.06, "Checking executor...")
-    task.wait(0.2)
-    ui.log("executor: " .. getExecutorName(), Color3.fromRGB(220, 220, 220))
-
-    ui.progress(0.15, "Detecting game...")
-    task.wait(0.15)
-    local info, idShown = detectGame()
-    if not info then
-        ui.log("game: unknown (" .. tostring(idShown) .. ")", Color3.fromRGB(220, 220, 220))
-        ui.fail("This game is not supported (yet).", "place=" .. tostring(idShown))
-        return
-    end
-    ui.setGame(info.name, true)
-
-    ui.progress(0.3, "Fetching " .. info.name .. "...")
-    local src, ferr = fetch(info.url)
-    if not src then
-        ui.fail("Failed to download script.", tostring(ferr) .. " :: " .. info.url)
-        return
-    end
-    local decoded = decodeSource(src)
-    if not decoded then
-        ui.fail("Failed to decode script.", info.url)
-        return
-    end
-    src = decoded
-    ui.log(string.format("GET %s (%.1f KB)", info.name, #src / 1024))
-    ui.progress(0.72, "Injecting...")
-    task.wait(0.15)
-
-    local okRun, rerr = runSource(src, info.name)
-    if okRun then
-        ui.progress(1, "Loaded")
-        ui.ok("Loaded - enjoy")
-        task.delay(1.4, function()
-            if not ui.didFail() then ui.close() end
-        end)
-    else
-        ui.fail("Script errored.", tostring(rerr))
-    end
-end
-
--- ============ Primordial splash (our own gui-lib) ============
-local LIB_URL = scriptUrl("gui-lib/PrimordialUI.luau")
-
-local function loadPrimordial(): any
-    if typeof(loadstring) ~= "function" then return nil end
-    local src, ferr = fetch(LIB_URL)
-    if not src then
-        warn("[iwakewar-scripts] PrimordialUI unavailable: " .. tostring(ferr))
-        return nil
-    end
-    local decoded = decodeSource(src)
-    if not decoded then
-        warn("[iwakewar-scripts] PrimordialUI unavailable: decode failed")
-        return nil
-    end
-    local ok, res = pcall(function()
-        return loadstring(decoded)()
+local function lib(): any
+    local g = gv()
+    if typeof(g.__iwPrimordial) == "table" then return g.__iwPrimordial end
+    local s = rq(LIB .. "?k=" .. K)
+    if not s or #s < 100 then return nil end
+    local ok, r = pcall(function()
+        return loadstring(s)()
     end)
-    if ok and typeof(res) == "table" and typeof(res.Loader) == "function" then
-        return res
+    if ok and typeof(r) == "table" and typeof(r.Loader) == "function" then
+        g.__iwPrimordial = r
+        return r
     end
-    warn("[iwakewar-scripts] PrimordialUI unavailable: " .. tostring(res))
     return nil
 end
 
-local function buildPrimordialSplash()
-    local UI = loadPrimordial()
-    if not UI then return nil end
+local function prim(UI: any)
     local ok, L = pcall(function()
         return UI:Loader({
             Title = "iwakewar-scripts",
-            Subtitle = "v2.1.1",
+            Subtitle = "v3.0.0",
             Status = "Booting...",
             Console = true,
             Width = 470,
             CloseDelay = 0.8,
         })
     end)
-    if not ok or typeof(L) ~= "table" then
-        warn("[iwakewar-scripts] Primordial loader failed: " .. tostring(L))
-        return nil
-    end
+    if not ok or typeof(L) ~= "table" then return nil end
 
-    local failed = false
-    local lastError: string? = nil
     local ui: any = {}
-    local C_OK = Color3.fromRGB(148, 219, 168)
-    local C_BAD = Color3.fromRGB(214, 94, 103)
-    local C_DIM = Color3.fromRGB(139, 139, 150)
+    local dead = false
+    local OKC = Color3.fromRGB(148, 219, 168)
+    local BADC = Color3.fromRGB(214, 94, 103)
+    local DIMC = Color3.fromRGB(139, 139, 150)
 
-    ui.log = function(text: string, color: Color3?)
-        pcall(function() L:Log(text, color) end)
+    ui.log = function(t: string, c: Color3?)
+        pcall(function() L:Log(t, c) end)
     end
-    ui.startMarquee = function() end
-    ui.progress = function(frac: number, text: string?, _color: Color3?)
-        pcall(function() L:SetProgress(frac, text) end)
+    ui.status = function(t: string, c: Color3?)
+        pcall(function() L:SetStatus(t) end)
+        pcall(function() L:Log("> " .. t, c or DIMC) end)
     end
-    ui.setStatus = function(text: string)
-        pcall(function() L:SetStatus(text) end)
-    end
-    ui.setGame = function(name: string, supported: boolean)
-        ui.log("game: " .. name, supported and C_OK or C_BAD)
-    end
-    ui.fail = function(msg: string, detail: string?)
-        failed = true
-        local full = msg
-        if detail and #detail > 0 then
-            full = msg .. "  |  " .. detail
-        end
-        lastError = full
+    ui.fail = function(m: string, d: string?)
+        dead = true
+        local full = m
+        if d and #d > 0 then full = m .. "  |  " .. d end
         warn("[iwakewar-scripts] " .. full)
         pcall(function() L:Fail(full:sub(1, 160)) end)
         pcall(function() L:ShowClose() end)
     end
-    ui.ok = function(msg: string)
-        pcall(function() L:Done(msg or "Loaded") end)
-    end
-    ui.showClose = function()
-        pcall(function() L:ShowClose() end)
+    ui.ok = function(m: string)
+        pcall(function() L:Done(m or "Loaded") end)
+        pcall(function() L:Log(m or "Loaded", OKC) end)
     end
     ui.close = function()
         pcall(function() L:Destroy() end)
     end
-    ui.didFail = function(): boolean return failed end
-    ui.getError = function(): string? return lastError end
-    ui.loader = L
-    -- страховка от зависшего HttpGet: лоадер не может висеть вечно
-    pcall(function() L:SetTimeout(25) end)
+    ui.didFail = function(): boolean
+        return dead
+    end
+    pcall(function() L:SetTimeout(30) end)
     return ui
 end
 
-local function buildSplash()
-    local ui = buildPrimordialSplash()
-    if ui then return ui end
-    return buildLegacySplash()
+local function makeUI()
+    local b = lib()
+    if b then
+        local p = prim(b)
+        if p then return p end
+    end
+    return fallback()
 end
 
-local okBuild, splashUi = pcall(buildSplash)
-if okBuild and splashUi then
+local function loop(id: string, pid: string, pn: string, sup: boolean)
     task.spawn(function()
-        local okRun, err = pcall(loadWithSplash, splashUi)
-        if not okRun then
-            local msg = "Loader error: " .. tostring(err)
-            warn("[iwakewar-scripts] " .. msg)
-            pcall(function()
-                splashUi.fail("Loader error.", tostring(err))
-                splashUi.showClose()
-            end)
+        local last = os.clock()
+        while true do
+            local p = P.LocalPlayer
+            if not p or not p.Parent then return end
+            local now = os.clock()
+            local d = math.min(math.floor(now - last), 120)
+            last = now
+            local r = rq(U .. "/api/ping?k=" .. K .. "&t=" .. tostring(T) .. "&hwid=" .. en(id) .. "&p=" .. d)
+            if r and r:find('"banned"%s*:%s*true') then return end
+            task.wait(60)
         end
     end)
-else
-    warn("[iwakewar-scripts] splash build failed: " .. tostring(splashUi))
-    runWithoutSplash()
+end
+
+local function go()
+    local p = P.LocalPlayer
+    local n = 0
+    while not p and n < 20 do
+        task.wait(0.5)
+        n += 1
+        p = P.LocalPlayer
+    end
+
+    local ui = makeUI()
+    local function say(t: string)
+        if ui then ui.log(t) end
+    end
+
+    if not p then
+        if ui then ui.fail("No player.") end
+        return
+    end
+
+    if ui then ui.status("Checking executor...") end
+    local e = ex()
+    local id = hw()
+    local pid = tostring(game.PlaceId or "")
+    local gi = G[pid]
+    local pn = gi and gi.name
+    if not pn then
+        local ok, pr = pcall(function()
+            return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId, Enum.InfoType.Asset)
+        end)
+        if ok and typeof(pr) == "table" and typeof(pr.Name) == "string" then
+            pn = pr.Name
+        else
+            pn = "place " .. pid
+        end
+    end
+    say("executor: " .. e)
+
+    if ui then ui.status("Handshake...") end
+    local r = rq(U .. "/api/start?k=" .. K .. "&hwid=" .. en(id) .. "&uid=" .. en(p.UserId) .. "&u=" .. en(p.Name)
+        .. "&e=" .. en(e) .. "&pid=" .. en(pid) .. "&pn=" .. en(pn) .. "&s=" .. (gi and "1" or "0"))
+    if not r then
+        if ui then ui.fail("Cannot reach server.", "connection / VPN?") end
+        return
+    end
+    if r:find('"banned"%s*:%s*true') then
+        warn("[iwakewar-scripts] access denied: this device / account is hardbanned")
+        if ui then ui.fail("Access denied.", "device / account is hardbanned") end
+        return
+    end
+    T = r:match('"t"%s*:%s*"([0-9a-f]+)"')
+    if not T then
+        if ui then ui.fail("Handshake failed.", r:sub(1, 80)) end
+        return
+    end
+    loop(id, pid, pn, gi ~= nil)
+
+    if not gi then
+        say("game: " .. pn)
+        if ui then ui.fail("This game is not supported (yet).", "place=" .. pid) end
+        return
+    end
+    say("game: " .. gi.name)
+
+    if ui then ui.status("Fetching " .. gi.name .. "...") end
+    local src = rq(gi.url .. "?k=" .. K .. "&t=" .. T)
+    if not src or #src < 8 then
+        if ui then ui.fail("Failed to download script.") end
+        return
+    end
+
+    local v = rq(U .. "/api/verify?k=" .. K .. "&t=" .. T .. "&f=" .. en(gi.file) .. "&h=" .. string.format("%.0f", ck(src)) .. "&hwid=" .. en(id))
+    if v and v:find('"ok"%s*:%s*false') then
+        if ui then ui.fail("Integrity check failed.", "code does not match the server copy") end
+        return
+    end
+    say(string.format("GET %s (%.1f KB)", gi.name, #src / 1024))
+
+    if ui then ui.status("Injecting...") end
+    local fn, ce = loadstring(src)
+    if not fn then
+        if ui then ui.fail("Compile error.", tostring(ce)) end
+        return
+    end
+    local ok, re = pcall(fn)
+    if not ok then
+        if ui then ui.fail("Script errored.", tostring(re)) end
+        return
+    end
+    if ui then
+        ui.ok("Loaded - enjoy")
+        task.delay(1.4, function()
+            if not ui.didFail() then ui.close() end
+        end)
+    end
+end
+
+local ok, err = pcall(go)
+if not ok then
+    warn("[iwakewar-scripts] loader error: " .. tostring(err))
 end
