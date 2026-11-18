@@ -12,6 +12,7 @@ local G = {
     ["6447798030"] = { n = "Funky Friday", f = "FunkyFriday Auto-Play.luau" },
     ["71106427459865"] = { n = "Игра в Слова", f = "WordGame Auto-Play.luau" },
     ["537413528"] = { n = "Build A Boat For Treasure", f = "BABFT.luau" },
+    ["16732694052"] = { n = "Fisch", f = "Fisch.luau" },
     ["93466613073564"] = { n = "Scoped FPS", f = "UnAim.luau" },
     ["114689356953798"] = { n = "Scoped FPS", f = "UnAim.luau" },
 }
