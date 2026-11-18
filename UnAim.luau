@@ -38,8 +38,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local plr = Players.LocalPlayer
 
 -- which game we are in: the aim core is shared, the camera/team/fire seams differ
-local RIVALS_PLACE = 17625359962
-local isRivals = (game.PlaceId == RIVALS_PLACE)
+local RIVALS_PLACES = { [17625359962] = true, [117398147513099] = true }
+local isRivals = RIVALS_PLACES[game.PlaceId] == true
 
 -- ---------------------------------------------------------------- teardown ---
 local genv = getgenv and getgenv() or _G
