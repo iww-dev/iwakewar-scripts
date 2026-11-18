@@ -18,6 +18,16 @@
 --   Firing = set LocalPlayer attribute "M1" + [C-S]SyncCombatAction:FireServer("M1", t)
 --   guarded by the game's own "CanAttack" attribute.
 --
+-- How the game is wired (RIVALS, PlaceId 17625359962):
+--   the camera is Scriptable, so aim = write workspace.CurrentCamera.CFrame
+--   (CFrame-lerp path; no SetAngles convention). Characters are Models in
+--   Workspace named by username and Player.Character points at them, so the
+--   shared Players-based target collection works; decoys (FakeSatchelModel,
+--   ViewModels, dropped weapons) are not player characters and are skipped.
+--   RIVALS does not use the Roblox Teams service in FFA (Team is nil), so the
+--   team filter falls back to Player.Team equality. Shots are validated
+--   server-side, so the trigger bot is Scoped FPS only here for now.
+--
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/UnAim.luau"))()
 
 local Players = game:GetService("Players")
@@ -26,6 +36,10 @@ local UIS = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local plr = Players.LocalPlayer
+
+-- which game we are in: the aim core is shared, the camera/team/fire seams differ
+local RIVALS_PLACE = 17625359962
+local isRivals = (game.PlaceId == RIVALS_PLACE)
 
 -- ---------------------------------------------------------------- teardown ---
 local genv = getgenv and getgenv() or _G
@@ -134,11 +148,21 @@ pcall(function() Window:SelectTab(1) end)
 
 -- ------------------------------------------------------- game integration ---
 local CameraController, MatchQuery, syncCombatAction
-do
-    local ok, m = pcall(require, ReplicatedStorage:WaitForChild("Utils"):WaitForChild("CameraController"))
-    if ok and type(m) == "table" then CameraController = m end
-    local ok2, m2 = pcall(require, ReplicatedStorage:WaitForChild("GameMode"):WaitForChild("MatchQuery"))
-    if ok2 and type(m2) == "table" then MatchQuery = m2 end
+if not isRivals then
+    -- Scoped FPS wiring. RIVALS has none of these modules, and WaitForChild on a
+    -- missing folder would hang the whole script at load - so probe, never wait.
+    local utils = ReplicatedStorage:FindFirstChild("Utils")
+    local cc = utils and utils:FindFirstChild("CameraController")
+    if cc then
+        local ok, m = pcall(require, cc)
+        if ok and type(m) == "table" then CameraController = m end
+    end
+    local gm = ReplicatedStorage:FindFirstChild("GameMode")
+    local mqMod = gm and gm:FindFirstChild("MatchQuery")
+    if mqMod then
+        local ok2, m2 = pcall(require, mqMod)
+        if ok2 and type(m2) == "table" then MatchQuery = m2 end
+    end
     local remote = ReplicatedStorage:FindFirstChild("Remote")
     local gameEvent = remote and remote:FindFirstChild("Event") and remote.Event:FindFirstChild("Game")
     if gameEvent then
@@ -173,6 +197,15 @@ end
 
 local function canDamage(name)
     if not S.teamCheck then
+        return true
+    end
+    if isRivals then
+        -- RIVALS does not use the Roblox Teams service in FFA (Team is nil for
+        -- everyone); in a team match both sides get a Team, so same Team = friendly
+        local tp = Players:FindFirstChild(name)
+        if tp and plr.Team and tp.Team and plr.Team == tp.Team then
+            return false
+        end
         return true
     end
     if not MatchQuery then
@@ -504,6 +537,9 @@ local function applyCameraAim(pos, dt)
 end
 
 local function shoot()
+    -- RIVALS validates shots server-side (origin/direction/timestamp), so a raw
+    -- remote fire would not register; trigger bot is Scoped FPS only for now
+    if isRivals then return end
     local now = os.clock()
     if now - S.lastShot < math.max(0.02, S.triggerDelay / 1000) then return end
     if plr:GetAttribute("CanAttack") ~= true then return end
@@ -910,6 +946,31 @@ local function addPreset(name, values)
     PRESETS[name] = values
     PRESET_ORDER[#PRESET_ORDER + 1] = name
 end
+
+-- Legit: a tight cone that only assists right around the crosshair, smooth
+-- exponential movement, no trigger and no on-screen visuals - looks like skill.
+addPreset("Legit", {
+    enabled = true,
+    activation = "Hold key",     -- only assists while you hold the aim key
+    fov = 15.00,                 -- tight cone, only near the crosshair
+    speed = 62.00,               -- quick but not an instant snap
+    smooth = 38.00,              -- buttery, human-like ease
+    curve = "Exponential",       -- eases in and never overshoots
+    snapAngle = 1.50,            -- small snap window
+    camDamp = 30.00,
+    prediction = 8.00,
+    part = "Head",
+    priority = "Closest to crosshair",
+    sticky = true,
+    releaseFov = 4.00,
+    visibleOnly = true,
+    teamCheck = true,
+    trigger = false,             -- you pull the trigger yourself
+    triggerFov = 1.00,
+    triggerDelay = 42.60,
+    drawFov = false,             -- hide the FOV circle
+    highlightTarget = false,     -- no target outline
+})
 
 -- Almost Full Rage: everything turned up to near-max, camera basically teleports
 -- onto the nearest bone and the trigger does the clicking.
