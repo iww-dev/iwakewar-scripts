@@ -473,6 +473,7 @@ end
 -- (1 - camDamp/100) of it - the target stays glued instead of being dragged off
 -- by every little hand twitch.
 local aimState = { yaw = nil, pitch = nil }
+local rivalsAimPos = nil
 
 local function applyCameraAim(pos, dt)
     if not pos then return end
@@ -528,10 +529,18 @@ local function applyCameraAim(pos, dt)
     if CameraController and type(CameraController.LerpToTarget) == "function" then
         pcall(CameraController.LerpToTarget, CameraController, pos, alpha)
     else
-        local cam = workspace.CurrentCamera
-        if cam then
-            local targetCF = CFrame.lookAt(eyePos, eyePos + u)
-            cam.CFrame = cam.CFrame:Lerp(targetCF, alpha)
+        if isRivals then
+            -- RIVALS's combat camera controller re-asserts CurrentCamera.CFrame on
+            -- its own RenderStepped, so a write here (earlier in the frame) gets
+            -- overwritten and the aim looks torn. We only record the aim point;
+            -- a BindToRenderStep at priority 2000 writes the CFrame last and wins.
+            rivalsAimPos = pos
+        else
+            local cam = workspace.CurrentCamera
+            if cam then
+                local targetCF = CFrame.lookAt(eyePos, eyePos + u)
+                cam.CFrame = cam.CFrame:Lerp(targetCF, alpha)
+            end
         end
     end
 end
@@ -612,6 +621,7 @@ local function step(dt)
         -- nothing locked: stop rebasing, the next lock starts from wherever the
         -- camera actually is
         aimState.yaw, aimState.pitch = nil, nil
+        rivalsAimPos = nil
     end
     S.target = target
     S.targetName = target and target.char.Name or "-"
@@ -1212,6 +1222,27 @@ Conn = RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
+-- RIVALS: write the camera CFrame last in the frame (priority 2000 > Last=1000)
+-- so it lands on top of the game's combat camera controller instead of being
+-- overwritten by it. step() records the aim point in rivalsAimPos each frame.
+local rivalsCamConn = nil
+if isRivals then
+    rivalsCamConn = RunService:BindToRenderStep("UnAimRivalsCam", 2000, function(dt)
+        if S.unloaded then return end
+        local pos = rivalsAimPos
+        if not pos then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        local eyePos = cam.CFrame.Position
+        local d = pos - eyePos
+        if d.Magnitude < 0.05 then return end
+        local u = d.Unit
+        local err = math.deg(math.acos(math.clamp(cam.CFrame.LookVector:Dot(u), -1, 1)))
+        local alpha = err <= S.snapAngle and 1 or aimAlpha(err, dt)
+        cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(eyePos, eyePos + u), alpha)
+    end)
+end
+
 task.spawn(function()
     while not S.unloaded do
         task.wait(0.5)
@@ -1272,6 +1303,8 @@ function api:Destroy()
     if S.unloaded then return end
     S.unloaded = true
     pcall(function() if Conn then Conn:Disconnect() end end)
+    pcall(function() if rivalsCamConn then RunService:UnbindFromRenderStep("UnAimRivalsCam") end end)
+    rivalsCamConn = nil
     pcall(function() if circleDraw then circleDraw:Remove() end end)
     circleDraw = nil
     pcall(function() if highlight then highlight:Destroy() end end)
