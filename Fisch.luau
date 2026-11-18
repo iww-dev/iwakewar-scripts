@@ -93,7 +93,7 @@ genv0.__fischUI = GUI
 -- every registered fn from runCleanup() when it switches/reloads a script.
 local STATE = STATE or {}
 local running = true
-if STATE.onCleanup then STATE.onCleanup(function() running = false end)
+if STATE.onCleanup then STATE.onCleanup(function() running = false end) end
 if type(genv0.__iwClean) == "function" then
     pcall(genv0.__iwClean, function()
         running = false
