@@ -15,8 +15,6 @@ local G = {
     ["16732694052"] = { n = "Fisch", f = "Fisch.luau" },
     ["93466613073564"] = { n = "Scoped FPS", f = "UnAim.luau" },
     ["114689356953798"] = { n = "Scoped FPS", f = "UnAim.luau" },
-    ["17625359962"] = { n = "RIVALS", f = "UnAim.luau" },
-    ["117398147513099"] = { n = "RIVALS", f = "UnAim.luau" },
 }
 
 local T: string? = nil
