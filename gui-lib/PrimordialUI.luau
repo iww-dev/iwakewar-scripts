@@ -638,11 +638,14 @@ function Lib:CreateWindow(cfg)
 
     -- drag --------------------------------------------------------------
     local dragging, dragStart, startPos = false, nil, nil
-    top.InputBegan:Connect(function(input)
+    local clampWindowIntoView -- defined after the footer is built
+    local function startDrag(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging, dragStart, startPos = true, input.Position, root.Position
         end
-    end)
+    end
+    top.InputBegan:Connect(startDrag)
+    footer.InputBegan:Connect(startDrag)
     UIS.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
@@ -656,6 +659,7 @@ function Lib:CreateWindow(cfg)
                 startPos.X.Scale, startPos.X.Offset + d.X,
                 startPos.Y.Scale, startPos.Y.Offset + d.Y
             )
+            clampWindowIntoView()
         end
     end)
 
@@ -713,6 +717,30 @@ function Lib:CreateWindow(cfg)
     }, root)
     vgrad(footer, P.chromeBottom, P.chromeTop)
     W.Footer = footer
+
+    -- keep the window on screen (also when the viewport shrinks) --------
+    clampWindowIntoView = function()
+        if not root.Parent then return end
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+        local sw, sh = root.AbsoluteSize.X, root.AbsoluteSize.Y
+        local p = root.Position
+        local ox, oy = p.X.Offset, p.Y.Offset
+        if math.abs(p.X.Scale) > 1e-4 or math.abs(p.Y.Scale) > 1e-4 then
+            local abs = root.AbsolutePosition
+            ox = abs.X + sw / 2
+            oy = abs.Y + sh / 2
+        end
+        local maxX = math.max(60, vp.X - sw / 2)
+        local maxY = math.max(60, vp.Y - sh / 2)
+        ox = math.clamp(ox, sw / 2, maxX)
+        oy = math.clamp(oy, sh / 2, maxY)
+        root.Position = UDim2.new(0, math.floor(ox), 0, math.floor(oy))
+    end
+    clampWindowIntoView()
+    if workspace.CurrentCamera then
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(clampWindowIntoView)
+    end
+
     local footLine = new("Frame", {
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
