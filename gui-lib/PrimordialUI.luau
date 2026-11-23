@@ -645,7 +645,6 @@ function Lib:CreateWindow(cfg)
         end
     end
     top.InputBegan:Connect(startDrag)
-    footer.InputBegan:Connect(startDrag)
     UIS.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
@@ -717,6 +716,7 @@ function Lib:CreateWindow(cfg)
     }, root)
     vgrad(footer, P.chromeBottom, P.chromeTop)
     W.Footer = footer
+    footer.InputBegan:Connect(startDrag)
 
     -- keep the window on screen (also when the viewport shrinks) --------
     clampWindowIntoView = function()
@@ -730,8 +730,8 @@ function Lib:CreateWindow(cfg)
             ox = abs.X + sw / 2
             oy = abs.Y + sh / 2
         end
-        local maxX = math.max(60, vp.X - sw / 2)
-        local maxY = math.max(60, vp.Y - sh / 2)
+        local maxX = math.max(sw / 2, vp.X - sw / 2)
+        local maxY = math.max(sh / 2, vp.Y - sh / 2)
         ox = math.clamp(ox, sw / 2, maxX)
         oy = math.clamp(oy, sh / 2, maxY)
         root.Position = UDim2.new(0, math.floor(ox), 0, math.floor(oy))
