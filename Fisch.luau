@@ -72,7 +72,7 @@ end
 
 -- GUI loader: our own gui-lib/PrimordialUI.luau, silent WindUI fallback so the
 -- script never dies on a download hiccup.
-local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau"
+local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau?v=3.3.5"
 local WINDUI_URL = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 local GUI
 do
@@ -129,7 +129,13 @@ local cfg = {
 }
 
 -- ================================================================ services
-local Net = ReplicatedStorage:WaitForChild("packages"):WaitForChild("Net")
+-- bounded waits: on a renamed/updated game a bare WaitForChild would hang the
+-- whole script before the GUI ever appears (no error, just nothing happens)
+local pkgs = ReplicatedStorage:FindFirstChild("packages") or ReplicatedStorage:WaitForChild("packages", 10)
+local Net = pkgs and (pkgs:FindFirstChild("Net") or pkgs:WaitForChild("Net", 10))
+if not Net then
+    error("[Fisch] ReplicatedStorage.packages.Net not found - game updated?", 0)
+end
 local CastRF = Net:FindFirstChild("RF/FishingRod/Cast")
 
 local ReelController
@@ -325,6 +331,11 @@ genv0.__fischCleanup = function()
     local conns = genv0.__fischShakeConns
     if conns then
         for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+    end
+    local rc = genv0.__fischRunConns
+    if rc then
+        for _, c in ipairs(rc) do pcall(function() c:Disconnect() end) end
+        genv0.__fischRunConns = nil
     end
     if GUI and type(GUI.Destroy) == "function" then
         pcall(function() GUI:Destroy() end)
@@ -575,8 +586,10 @@ end)
 
 -- =============================================================== main loop
 local lastAfk = os.clock()
+local runConns = {}
+genv0.__fischRunConns = runConns
 
-RunService.Heartbeat:Connect(function()
+runConns[#runConns + 1] = RunService.Heartbeat:Connect(function()
     if not alive() then return end
 
     -- auto-shake: press Return while the shake minigame is on screen
@@ -604,7 +617,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- the bar size is also recomputed on the render step, so cover that too
-RunService.RenderStepped:Connect(function()
+runConns[#runConns + 1] = RunService.RenderStepped:Connect(function()
     if not alive() then return end
     pcall(applyReelHack)
 end)
@@ -618,6 +631,7 @@ if LP.Idled then
                 VirtualUser:ClickButton2(Vector2.new())
             end)
         end)
+        runConns[#runConns + 1] = genv0.__fischIdled
     end)
 end
 
