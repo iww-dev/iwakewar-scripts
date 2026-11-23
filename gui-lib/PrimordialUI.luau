@@ -681,11 +681,13 @@ function Lib:CreateWindow(cfg)
         { 0, 0.88 }, { 1, 1 },
     }))
 
+    local SIDEBAR_MIN, SIDEBAR_MAX = 120, 320
+    local sidebarW = math.clamp(math.floor(winW * 0.26), 140, 196)
     local sidebar = new("Frame", {
         Name = "Sidebar",
         BackgroundColor3 = P.chrome,
         BorderSizePixel = 0,
-        Size = UDim2.new(0, 196, 1, 0),
+        Size = UDim2.new(0, sidebarW, 1, 0),
         ClipsDescendants = true,
     }, body)
     vgrad(sidebar, P.sidebarTop, P.sidebarBottom)
@@ -699,7 +701,7 @@ function Lib:CreateWindow(cfg)
         BackgroundColor3 = P.stroke,
         BorderSizePixel = 0,
         Size = UDim2.new(0, 1, 1, -42),
-        Position = UDim2.new(0, 196, 0, 42),
+        Position = UDim2.new(0, sidebarW, 0, 42),
         ZIndex = 10,
     }, root)
     vgrad(sbLine, P.stroke, P.stroke, numberSeq({
@@ -801,6 +803,184 @@ function Lib:CreateWindow(cfg)
         Position = UDim2.fromOffset(197, 0),
     }, body)
     W.Content = content
+
+    -- responsive helpers -------------------------------------------------
+    -- every tab registers a callback here so the strip can shrink its labels
+    -- when the window gets narrow (phones) without rebuilding anything
+    local compactors = {}
+    local function refreshCompactors()
+        local w = root.AbsoluteSize.X
+        if w <= 0 then return end
+        for _, fn in ipairs(compactors) do pcall(fn, w) end
+    end
+
+    -- sidebar resize ------------------------------------------------------
+    local SB_GRAB = 14
+    local sbGrab -- created below, referenced by setSidebarWidth
+    local function setSidebarWidth(w)
+        local bodyW = body.AbsoluteSize.X
+        if bodyW <= 0 then bodyW = winWFull end
+        local maxW = math.max(SIDEBAR_MIN, math.min(SIDEBAR_MAX, bodyW - 200))
+        sidebarW = math.clamp(math.floor(tonumber(w) or sidebarW), SIDEBAR_MIN, maxW)
+        sidebar.Size = UDim2.new(0, sidebarW, 1, 0)
+        sbLine.Position = UDim2.new(0, sidebarW, 0, 42)
+        sbGrab.Position = UDim2.new(0, sidebarW - math.floor(SB_GRAB / 2), 0, 42)
+        content.Position = UDim2.fromOffset(sidebarW + 1, 0)
+        content.Size = UDim2.new(1, -(sidebarW + 1), 1, 0)
+    end
+
+    sbGrab = new("Frame", {
+        Name = "SidebarGrip",
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, SB_GRAB, 1, -74),
+        Position = UDim2.new(0, sidebarW - math.floor(SB_GRAB / 2), 0, 42),
+        ZIndex = 12,
+        Active = true,
+    }, root)
+    local sbGrip = new("Frame", {
+        BackgroundColor3 = P.accent,
+        BackgroundTransparency = 0.82,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 1, 0, 30),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        ZIndex = 13,
+    }, sbGrab)
+    corner(sbGrip, 1)
+
+    local sbDragging, sbStartX, sbStartW, sbLastTap = false, 0, 0, 0
+    sbGrab.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local now = os.clock()
+        if now - sbLastTap < 0.35 then
+            sbLastTap = 0
+            sbDragging = false
+            local resetW = math.clamp(math.floor(winWFull * 0.26), 140, 196)
+            tween(sidebar, 0.16, { Size = UDim2.new(0, resetW, 1, 0) })
+            -- let the tween land, then sync the rest of the layout
+            task.delay(0.18, function() setSidebarWidth(resetW) end)
+            sbGrip.BackgroundTransparency = 0.82
+            return
+        end
+        sbLastTap = now
+        sbDragging, sbStartX, sbStartW = true, input.Position.X, sidebarW
+        sbGrip.BackgroundTransparency = 0.1
+    end)
+    sbGrab.MouseEnter:Connect(function()
+        if not sbDragging then sbGrip.BackgroundTransparency = 0.35 end
+    end)
+    sbGrab.MouseLeave:Connect(function()
+        if not sbDragging then sbGrip.BackgroundTransparency = 0.82 end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if not sbDragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        setSidebarWidth(sbStartW + (input.Position.X - sbStartX))
+    end)
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        if sbDragging then
+            sbDragging = false
+            sbGrip.BackgroundTransparency = 0.82
+        end
+    end)
+
+    -- window width grip ("ямка" on the right edge) ------------------------
+    local GRIP_W = 12
+    local winGrip = new("Frame", {
+        Name = "ResizeGrip",
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, GRIP_W, 1, 0),
+        Position = UDim2.new(1, -GRIP_W, 0, 0),
+        ZIndex = 20,
+        Active = true,
+    }, body)
+    local recess = new("Frame", {
+        BackgroundColor3 = P.chromeBottom,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 10, 0, 38),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        ZIndex = 21,
+    }, winGrip)
+    corner(recess, 4)
+    stroke(recess, P.stroke, 1, 0.25)
+    local recessDots = {}
+    for i = 1, 3 do
+        local dot = new("Frame", {
+            BackgroundColor3 = P.sub,
+            BackgroundTransparency = 0.55,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(1, 16),
+            Position = UDim2.new(0.5, (i - 2) * 3, 0.5, 0),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            ZIndex = 22,
+        }, recess)
+        corner(dot, 1)
+        recessDots[i] = dot
+    end
+
+    local winResizing = false
+    local resizeStartX, resizeStartW, resizeStartLeft, resizeStartCenterY = 0, 0, 0, 0
+    local function setGripTint(alpha)
+        for _, dot in ipairs(recessDots) do dot.BackgroundTransparency = alpha end
+    end
+    winGrip.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        winResizing = true
+        resizeStartX = input.Position.X
+        resizeStartW = winWFull
+        local abs = root.AbsolutePosition
+        resizeStartLeft = abs.X
+        resizeStartCenterY = abs.Y + root.AbsoluteSize.Y / 2
+        setGripTint(0.1)
+    end)
+    winGrip.MouseEnter:Connect(function()
+        if not winResizing then setGripTint(0.3) end
+        tween(recess, 0.1, { BackgroundTransparency = 0 })
+    end)
+    winGrip.MouseLeave:Connect(function()
+        if not winResizing then setGripTint(0.55) end
+        tween(recess, 0.1, { BackgroundTransparency = 0.1 })
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if not winResizing then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+        local newW = math.clamp(math.floor(resizeStartW + (input.Position.X - resizeStartX)), 360, math.floor(vp.X * 0.98))
+        local left = math.clamp(resizeStartLeft, 0, math.max(0, vp.X - newW))
+        winWFull = newW
+        root.Size = UDim2.fromOffset(newW, root.Size.Y.Offset)
+        root.Position = UDim2.new(0, math.floor(left + newW / 2), 0, math.floor(resizeStartCenterY))
+        setSidebarWidth(sidebarW)
+        refreshCompactors()
+    end)
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        if winResizing then
+            winResizing = false
+            setGripTint(0.55)
+            clampWindowIntoView()
+        end
+    end)
+
+    setSidebarWidth(sidebarW)
+    refreshCompactors()
+    if workspace.CurrentCamera then
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            setSidebarWidth(sidebarW)
+            refreshCompactors()
+        end)
+    end
 
     -- notifications ------------------------------------------------------
     local ngui = Instance.new("ScreenGui")
@@ -1496,9 +1676,20 @@ function Lib:CreateWindow(cfg)
         }, content)
         tab.Page = page
 
-        local strip = new("Frame", {
+        -- horizontal strip: scrolls sideways when the window is narrow
+        local strip = new("ScrollingFrame", {
             BackgroundTransparency = 1,
+            BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 34),
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.X,
+            ScrollingDirection = Enum.ScrollingDirection.X,
+            ScrollingEnabled = true,
+            ScrollBarThickness = 2,
+            ScrollBarImageColor3 = P.stroke,
+            ScrollBarImageTransparency = 0.4,
+            ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
+            ClipsDescendants = true,
         }, page)
         local stripLayout = listLayout(strip, 0, Enum.FillDirection.Horizontal)
         stripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -1555,6 +1746,22 @@ function Lib:CreateWindow(cfg)
         }, W_MED)
         padAll(defaultChip, 14, 0, 14, 0)
         tab.DefaultChip = defaultChip
+        tab._chipObjs = { defaultChip }
+
+        -- phones: smaller chip text so more of the strip fits before scrolling
+        compactors[#compactors + 1] = function(w)
+            local compact = w < 560
+            for i = #tab._chipObjs, 1, -1 do
+                local obj = tab._chipObjs[i]
+                if obj and obj.Parent then
+                    obj.TextSize = compact and 12 or 14
+                else
+                    table.remove(tab._chipObjs, i)
+                end
+            end
+            stripPad.PaddingLeft = UDim.new(0, compact and 4 or 6)
+            stripPad.PaddingRight = UDim.new(0, compact and 10 or 14)
+        end
 
         function tab:_addChip(sectionEntry)
             if defaultChip then
@@ -1576,6 +1783,10 @@ function Lib:CreateWindow(cfg)
             }, W_MED)
             padAll(chip, 16, 0, 16, 0)
             corner(chip, 3)
+            if tab._chipObjs then
+                tab._chipObjs[#tab._chipObjs + 1] = chip
+                refreshCompactors()
+            end
             local chipGlow = new("Frame", {
                 BackgroundColor3 = P.accent,
                 BorderSizePixel = 0,
@@ -1643,11 +1854,24 @@ function Lib:CreateWindow(cfg)
             end
             tab.SelectedSection = sectionEntry
             pcall(function()
+                -- bring the active chip into view when the strip is scrollable
+                if sectionEntry.Chip then
+                    local chipAbs = sectionEntry.Chip.AbsolutePosition.X
+                    local chipW = sectionEntry.Chip.AbsoluteSize.X
+                    local viewW = strip.AbsoluteSize.X
+                    if viewW > 0 and chipW > 0 then
+                        local rel = chipAbs - strip.AbsolutePosition.X + strip.CanvasPosition.X
+                        local maxX = math.max(0, strip.AbsoluteCanvasSize.X - viewW)
+                        local target = math.clamp(rel + chipW / 2 - viewW / 2, 0, maxX)
+                        tween(strip, 0.18, { CanvasPosition = Vector2.new(target, 0) })
+                    end
+                end
                 tween(scroll, 0.18, { CanvasPosition = Vector2.new(0, 0) })
             end)
         end
 
         W.Tabs[#W.Tabs + 1] = tab
+        pcall(refreshCompactors)
         if not W.Active then
             setTabActive(tab)
         else
