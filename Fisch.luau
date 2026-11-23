@@ -72,7 +72,7 @@ end
 
 -- GUI loader: our own gui-lib/PrimordialUI.luau, silent WindUI fallback so the
 -- script never dies on a download hiccup.
-local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau?v=3.3.5"
+local LIB_URL = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/refs/heads/main/gui-lib/PrimordialUI.luau?v=3.3.6"
 local WINDUI_URL = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 local GUI
 do
