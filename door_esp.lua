@@ -9,6 +9,9 @@ local TweenService = game:GetService("TweenService")
 local SoundService = game:GetService("SoundService")
 local lp = Players.LocalPlayer
 
+-- where our instances live (executor UI, else CoreGui)
+local gparent = (gethui and gethui()) or game:GetService("CoreGui")
+
 -- ===== state =====
 -- Keep the old table around (a previous version's loop may still hold it) but
 -- move to a fresh one so a stale loop can never draw/teleport anymore.
@@ -113,6 +116,20 @@ local function makeLabel(part, color, worldOffsetY)
 	return bg, lbl
 end
 
+-- 3D box drawn by the engine itself (no Drawing API, always on top)
+local function makeBox(part, color)
+	local box = Instance.new("BoxHandleAdornment")
+	box.Name = "TsbEspBox"
+	box.Adornee = part
+	box.AlwaysOnTop = true
+	box.ZIndex = 2
+	box.Color3 = color
+	box.Transparency = 0.35
+	box.Size = part.Size
+	box.Parent = gparent
+	return track(box)
+end
+
 -- ===== DOOR trees =====
 local function addDoor(tree)
 	if esp.doors[tree] or not tree.Parent then return end
@@ -124,6 +141,7 @@ local function addDoor(tree)
 		model = door,
 		part = part,
 		hl = makeHighlight(door, DOOR_COLOR),
+		box = makeBox(part, DOOR_COLOR),
 	}
 	e.gui, e.label = makeLabel(part, DOOR_COLOR, part.Size.Y / 2 + 1.2)
 	esp.doors[tree] = e
@@ -153,6 +171,7 @@ local function addPeny(obj)
 		model = obj,
 		part = part,
 		hl = makeHighlight(obj, PENY_COLOR),
+		box = makeBox(part, PENY_COLOR),
 	}
 	e.gui, e.label = makeLabel(part, PENY_COLOR, part.Size.Y / 2 + 1.6)
 	esp.peny[obj] = e
@@ -162,7 +181,11 @@ end
 local function prune(map, field)
 	for obj, e in pairs(map) do
 		if not obj.Parent or not e.part.Parent then
-			pcall(function() e.hl:Destroy() e.gui:Destroy() end)
+			pcall(function()
+				if e.hl then e.hl:Destroy() end
+				if e.gui then e.gui:Destroy() end
+				if e.box then e.box:Destroy() end
+			end)
 			map[obj] = nil
 		end
 	end
@@ -203,6 +226,7 @@ trackConn(RunService.Heartbeat:Connect(function(dt)
 		local on = st.door and e.part.Parent ~= nil
 		e.hl.Enabled = on
 		e.gui.Enabled = on
+		e.box.Visible = on
 		if on then
 			e.label.Text = string.format("DOOR  %.0fm", (e.part.Position - cpos).Magnitude)
 		end
@@ -211,6 +235,7 @@ trackConn(RunService.Heartbeat:Connect(function(dt)
 		local on = st.penyta and e.part.Parent ~= nil
 		e.hl.Enabled = on
 		e.gui.Enabled = on
+		e.box.Visible = on
 		if on then
 			local hp, mx = hpOf(obj)
 			hp = hp and (math.floor(hp * 10 + 0.5) / 10) or "?"
@@ -305,7 +330,6 @@ local function setPromptPatch(on)
 end
 
 -- ===== GUI (anchor-centered; no stretched parent frame) =====
-local gparent = (gethui and gethui()) or game:GetService("CoreGui")
 local existing = gparent:FindFirstChild("DoorEspUi")
 if existing then existing:Destroy() end
 local gui = Instance.new("ScreenGui")
