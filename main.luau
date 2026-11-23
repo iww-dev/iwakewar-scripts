@@ -4,7 +4,7 @@ local U = "https://iwakewar.fun"
 local K = "5c03f42e392c0f1bbe531eb23315ecc1b452b0587d17024e"
 local B = U .. "/scripts/"
 local R = "https://raw.githubusercontent.com/iww-dev/iwakewar-scripts/main/"
-local V = "v3.3.4"
+local V = "v3.3.5"
 local ACC_ON = false -- аккаунты временно отключены
 
 local G = {
